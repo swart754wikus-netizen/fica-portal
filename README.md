@@ -26,6 +26,15 @@ npm test
 ```
 Mock provider test triggers (surname, for the client and for every person listed behind an entity): `Sanctioned` → sanctions hit, `Politician` → PEP, `Headline` → adverse media.
 
+## Hosting on Render (recommended)
+
+`render.yaml` sets everything up: Node 22, a 1 GB permanent disk at `/var/data` for the database and encrypted
+documents, HTTPS, and a randomly generated `DATA_KEY`. On Render: **New → Blueprint → this repo**, enter
+`FIRM_NAME` and `BASE_URL`, deploy, then create staff from the service's **Shell** tab with
+`npm run create-staff -- you@firm.co.za "Your Name" compliance`. Region is Frankfurt (no South African region) —
+state the cross-border transfer in the privacy notice (POPIA s72). Never change `DATA_KEY` after the first deploy:
+existing data could no longer be decrypted. Enable Render's disk snapshots / backups.
+
 ## Security controls
 | Control | Implementation |
 |---|---|

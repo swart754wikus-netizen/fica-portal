@@ -1,0 +1,32 @@
+# Render Blueprint: New → Blueprint → pick this repo. Creates the web service with a
+# permanent disk for the database and encrypted documents.
+services:
+  - type: web
+    name: fica-portal
+    runtime: node
+    region: frankfurt          # closest Render region to South Africa (EU / GDPR)
+    plan: starter              # a persistent disk needs a paid plan
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /var/data/fica.db
+      - key: DATA_KEY            # encrypts all client data — Render generates it; never change it later
+        generateValue: true
+      - key: FIRM_NAME           # e.g. "Mokoena & Partners Chartered Accountants"
+        sync: false
+      - key: BASE_URL            # the site's public address, e.g. https://fica-portal.onrender.com
+        sync: false
+      - key: SCREENING_PROVIDER
+        value: mock
+      - key: MAIL_TRANSPORT
+        value: log

@@ -119,3 +119,5 @@ td.num, th.num { text-align: right; }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .1rem 1rem; }
 .check-grid .check { margin-bottom: .4rem; }
 .related-row { border: 1px solid var(--line); border-radius: 10px; padding: .9rem .9rem .2rem; margin-bottom: .8rem; background: #fbfcfe; }
+
+.test-banner { background: #fff4d6; color: #8a5a00; border-bottom: 1px solid #f0d68f; text-align: center; font-weight: 700; font-size: .875rem; padding: .5rem 16px; }

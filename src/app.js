@@ -19,7 +19,7 @@ export function createApp({ db, config, provider = getProvider(config.provider),
   app.set('views', join(root, 'views'));
   app.set('trust proxy', config.isProd ? 1 : false);
   app.disable('x-powered-by');
-  Object.assign(app.locals, catalog, { firmName: config.firmName || 'Our firm' });
+  Object.assign(app.locals, catalog, { firmName: config.firmName || 'Our firm', mockScreening: (config.provider || 'mock') === 'mock' });
 
   app.use(helmet({
     contentSecurityPolicy: {

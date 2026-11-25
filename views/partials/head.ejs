@@ -24,4 +24,7 @@
     <% } %>
   </div>
 </header>
+<% if (locals.staff && locals.mockScreening) { %>
+  <div class="test-banner" role="status">TEST SCREENING — identity, sanctions and PEP results are simulated, not real. Connect a screening provider before relying on them.</div>
+<% } %>
 <main class="wrap">
