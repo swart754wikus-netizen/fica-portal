@@ -1,10 +1,20 @@
 {
-  "regions": ["cpt1"],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "regions": [
+    "cpt1"
+  ],
   "functions": {
     "api/index.js": {
       "includeFiles": "{views,public,config}/**",
       "maxDuration": 60
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
 }
