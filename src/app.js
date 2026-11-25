@@ -1,6 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { loadSession } from './security/session.js';
@@ -10,7 +10,15 @@ import { getProvider } from './providers/index.js';
 import { getMailer } from './email/index.js';
 import * as catalog from './onboarding/catalog.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Project root (views/, public/, config/). import.meta.url can be empty when a bundler
+// converts this module to CommonJS (as Vercel may), so fall back to the working directory.
+const root = (() => {
+  try {
+    const fromModule = join(dirname(fileURLToPath(import.meta.url)), '..');
+    if (existsSync(join(fromModule, 'views'))) return fromModule;
+  } catch { /* fall through */ }
+  return process.cwd();
+})();
 
 export function createApp({ store, config, provider = getProvider(config.provider), mailer = getMailer(config), rmcp } = {}) {
   rmcp ??= JSON.parse(readFileSync(join(root, 'config/rmcp.json'), 'utf8'));
