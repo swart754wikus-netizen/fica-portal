@@ -8,17 +8,21 @@
 
 process.on('unhandledRejection', (err) => console.error('UNHANDLED REJECTION:', err));
 
-const SAFE = /^(Missing Vercel environment|FIREBASE_PRIVATE_KEY must|DATA_KEY must|Failed to parse private key|Service account object must|Invalid PEM)/;
+const SAFE = /^(Missing Vercel environment|FIREBASE_PRIVATE_KEY must|FIREBASE_SERVICE_ACCOUNT must|DATA_KEY must|Failed to parse private key|Service account object must|Invalid PEM)/;
 let ready;
 
 async function start() {
-  const missing = ['DATA_KEY', 'FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_STORAGE_BUCKET', 'BASE_URL', 'FIRM_NAME']
-    .filter((k) => !process.env[k]);
-  if (missing.length) throw new Error(`Missing Vercel environment variable(s): ${missing.join(', ')}`);
-  if (!/BEGIN PRIVATE KEY/.test(process.env.FIREBASE_PRIVATE_KEY) || !/END PRIVATE KEY/.test(process.env.FIREBASE_PRIVATE_KEY)) {
-    throw new Error('FIREBASE_PRIVATE_KEY must be the whole private_key value from the JSON file, from -----BEGIN PRIVATE KEY----- to -----END PRIVATE KEY-----\\n');
-  }
+  // Validates and normalises settings (incl. FIREBASE_SERVICE_ACCOUNT) before anything else.
   const { config } = await import('../src/config.js');
+  const fb = config.firebase;
+  const missing = [
+    ['DATA_KEY', process.env.DATA_KEY], ['BASE_URL', process.env.BASE_URL], ['FIRM_NAME', process.env.FIRM_NAME],
+    ['FIREBASE_PROJECT_ID', fb.projectId], ['FIREBASE_CLIENT_EMAIL', fb.clientEmail], ['FIREBASE_PRIVATE_KEY', fb.privateKey], ['FIREBASE_STORAGE_BUCKET', fb.storageBucket],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length) throw new Error(`Missing Vercel environment variable(s): ${missing.join(', ')} (tip: FIREBASE_SERVICE_ACCOUNT = the whole .json key file covers all the FIREBASE_ ones)`);
+  if (!/BEGIN PRIVATE KEY/.test(fb.privateKey) || !/END PRIVATE KEY/.test(fb.privateKey)) {
+    throw new Error('FIREBASE_PRIVATE_KEY must be the whole private_key value from the JSON file. Easier: add FIREBASE_SERVICE_ACCOUNT containing the entire .json key file (it overrides the separate key settings)');
+  }
   const { createStore } = await import('../src/store/index.js');
   const { createApp } = await import('../src/app.js');
   return createApp({ store: await createStore(config), config });

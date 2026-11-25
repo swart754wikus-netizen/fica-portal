@@ -8,6 +8,15 @@ if (existsSync('.env')) {
   }
 }
 
+// Easiest setup: paste the whole service-account JSON file into FIREBASE_SERVICE_ACCOUNT.
+// When present it wins over the individual FIREBASE_* variables (except the bucket).
+let serviceAccount = {};
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try { serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT.trim()); } catch {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT must be the complete contents of the downloaded .json key file (open it in Notepad, Ctrl+A, Ctrl+C, paste)');
+  }
+}
+
 const key = Buffer.from((process.env.DATA_KEY || '').trim(), 'base64');
 if (key.length !== 32) {
   throw new Error('DATA_KEY must be a 32-byte base64 value (about 44 characters ending in =). Generate one as described in the README and set it in Vercel (or .env locally).');
@@ -28,11 +37,11 @@ export const config = {
   // "sqlite" = local file (development/tests); "firestore" = Firebase (production on Vercel)
   store: process.env.STORE || (process.env.VERCEL ? 'firestore' : 'sqlite'),
   firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID?.trim(),
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL?.trim().replace(/^"|",?$/g, ''),
+    projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID?.trim(),
+    clientEmail: serviceAccount.client_email || process.env.FIREBASE_CLIENT_EMAIL?.trim().replace(/^"|",?$/g, ''),
     // Tolerate the value being pasted with its JSON quotes or trailing spaces.
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.trim().replace(/^"|",?$/g, ''),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET?.trim().replace(/^gs:\/\//, ''),
+    privateKey: serviceAccount.private_key || process.env.FIREBASE_PRIVATE_KEY?.trim().replace(/^"|",?$/g, ''),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET?.trim().replace(/^gs:\/\//, '') || (serviceAccount.project_id && `${serviceAccount.project_id}.firebasestorage.app`),
   },
   // One-time code for /staff/setup (create the first compliance officer from the browser).
   setupToken: process.env.SETUP_TOKEN || '',
