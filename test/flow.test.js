@@ -35,7 +35,13 @@ after(() => server.close());
 const cookieOf = (res) => res.headers.get('set-cookie')?.split(';')[0];
 const csrfOf = (html) => html.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
-async function login({ email, secret }) {
+const sessions = new Map();
+// Reuse one session per staff member: logging in for every test would (correctly) trip the login rate limiter.
+async function login(who) {
+  if (!sessions.has(who.email)) sessions.set(who.email, await freshLogin(who));
+  return sessions.get(who.email);
+}
+async function freshLogin({ email, secret }) {
   let res = await fetch(`${base}/staff/login`, { method: 'POST', redirect: 'manual', body: new URLSearchParams({ email, password: 'a-long-test-password' }) });
   assert.equal(res.status, 302);
   let cookie = cookieOf(res);
@@ -56,7 +62,7 @@ async function invite(sess, name) {
 
 function clientForm(overrides = {}) {
   const fd = new FormData();
-  const fields = { firstName: 'Thandi', lastName: 'Nkosi', idType: 'sa_id', idNumber: makeSaId('900515012308'), nationality: 'ZA', countryOfResidence: 'ZA',
+  const fields = { clientType: 'individual', services: 'tax', firstName: 'Thandi', lastName: 'Nkosi', idType: 'sa_id', idNumber: makeSaId('900515012308'), nationality: 'ZA', countryOfResidence: 'ZA',
     phone: '+27 82 123 4567', addressLine1: '1 Main Rd', city: 'Cape Town', province: 'WC', postalCode: '8001', occupation: 'Engineer',
     sourceOfFunds: 'salary', expectedValueZar: '80000', purpose: 'Purchase of residential property', pepDeclared: 'no', consent: 'on', declaration: 'on', ...overrides };
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) fd.append(k, v);
@@ -199,4 +205,84 @@ test('email failure falls back to showing the link and is audited', async () => 
     assert.match(html, /\/onboard\//);
     assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'invite.email_failed'").get());
   } finally { mailer.fail = false; }
+});
+
+const pdfBlob = (t = 'doc') => new Blob([Buffer.from(`%PDF-1.4 ${t}`)], { type: 'application/pdf' });
+function companyForm({ related, services = ['afs', 'company_secretarial'], omitDocs = [] } = {}) {
+  const fd = clientForm({ clientType: 'company', services: undefined, lastName: 'Rep' });
+  for (const s of services) fd.append('services', s);
+  const entity = { entityName: 'Bokamoso Holdings (Pty) Ltd', entitySubtype: 'pty', entityRegNumber: '2019/123456/07', entityTaxNumber: '9123456789',
+    entityAddress: '10 Long St, Cape Town', natureOfBusiness: 'Property investment', cashIntensive: 'no', capacity: 'Director' };
+  for (const [k, v] of Object.entries(entity)) fd.append(k, v);
+  (related ?? [{ name: 'Sipho Dlamini', idNumber: makeSaId('850101500908'), role: 'director', ownership: '60', nationality: 'ZA', pep: 'no' }])
+    .forEach((p, i) => { for (const [k, v] of Object.entries(p)) fd.append(`related[${i}][${k}]`, v); });
+  for (const f of ['cipcCertificate', 'businessAddressProof', 'authorityResolution', 'relatedIds']) if (!omitDocs.includes(f)) fd.append(f, pdfBlob(f), `${f}.pdf`);
+  fd.append('relatedIds', pdfBlob('second id'), 'id2.pdf');
+  return fd;
+}
+
+test('company: entity details, owners and documents are captured and screened', async () => {
+  const sess = await login(staff.officer);
+  const path = await invite(sess, 'Bokamoso Holdings');
+  const res = await fetch(base + path, { method: 'POST', body: companyForm() });
+  assert.equal(res.status, 200, (await res.text()).match(/field-error[^<]*<|role="alert"[^<]*</g)?.join(' '));
+  const c = db.prepare("SELECT * FROM cases WHERE client_name = 'Bokamoso Holdings'").get();
+  assert.equal(c.client_type, 'company');
+  const risk = JSON.parse(c.risk_breakdown);
+  assert.ok(risk.factors.some((f) => f.factor === 'Trust & company services requested'), 'TCSP service weighted');
+  const kinds = db.prepare('SELECT kind FROM documents WHERE case_id = ?').all(c.id).map((r) => r.kind).sort();
+  assert.deepEqual(kinds, ['authorityResolution', 'businessAddressProof', 'cipcCertificate', 'idDocument', 'proofOfAddress', 'relatedIds', 'relatedIds']);
+  const screening = JSON.parse(c.screening);
+  assert.equal(screening.related.length, 1);
+  const page = await (await fetch(`${base}/staff/cases/${c.id}`, { headers: { cookie: sess.cookie } })).text();
+  assert.match(page, /Bokamoso Holdings \(Pty\) Ltd/);
+  assert.match(page, /Sipho Dlamini/);
+  assert.match(page, /Company or close corporation/);
+  const report = await (await fetch(`${base}/staff/cases/${c.id}/report`, { headers: { cookie: sess.cookie } })).text();
+  assert.match(report, /Owners, directors &amp; controllers/);
+});
+
+test('company: sanctioned director makes the whole client high risk', async () => {
+  const sess = await login(staff.officer);
+  const path = await invite(sess, 'Shady Co');
+  await fetch(base + path, { method: 'POST', body: companyForm({ related: [
+    { name: 'Clean Person', idNumber: makeSaId('850101500908'), role: 'director', nationality: 'ZA', pep: 'no' },
+    { name: 'Bad Sanctioned', idNumber: 'P1234567', role: 'shareholder', ownership: '40', nationality: 'GB', pep: 'no' },
+  ] }) });
+  const c = db.prepare("SELECT * FROM cases WHERE client_name = 'Shady Co'").get();
+  assert.equal(c.risk_level, 'high');
+  assert.equal(c.dd_level, 'EDD');
+  const factors = JSON.parse(c.risk_breakdown).factors.map((f) => f.factor);
+  assert.ok(factors.includes('Sanctions match: owners / controllers'));
+  assert.ok(factors.includes('Foreign owners / controllers'));
+});
+
+test('company: owners and entity documents are required', async () => {
+  const sess = await login(staff.officer);
+  const path = await invite(sess, 'Incomplete Co');
+  const res = await fetch(base + path, { method: 'POST', body: companyForm({ related: [], omitDocs: ['cipcCertificate'] }) });
+  assert.equal(res.status, 400);
+  const html = await res.text();
+  assert.match(html, /Add at least one person/);
+  assert.match(html, /CIPC registration certificate/);
+});
+
+test('trust with PEP beneficiary and layered owner is high risk', async () => {
+  const sess = await login(staff.officer);
+  const path = await invite(sess, 'Family Trust');
+  const fd = clientForm({ clientType: 'trust', services: 'trust_services', lastName: 'Trustee' });
+  const t = { entityName: 'Nkosi Family Trust', entitySubtype: 'inter_vivos', entityRegNumber: 'IT1234/2015', entityAddress: '1 Main Rd', natureOfBusiness: 'Holds family investments', cashIntensive: 'no', capacity: 'Trustee' };
+  for (const [k, v] of Object.entries(t)) fd.append(k, v);
+  [{ name: 'Thandi Nkosi', idNumber: makeSaId('900515012308'), role: 'trustee', nationality: 'ZA', pep: 'no' },
+   { name: 'Minister Nkosi', idNumber: makeSaId('600101500908'), role: 'beneficiary', nationality: 'ZA', pep: 'yes' },
+   { name: 'Nkosi Holdings (Pty) Ltd', role: 'beneficiary', nationality: 'ZA', pep: 'no', isEntity: 'on' }]
+    .forEach((p, i) => { for (const [k, v] of Object.entries(p)) fd.append(`related[${i}][${k}]`, v); });
+  for (const f of ['letterOfAuthority', 'trustDeed', 'authorityResolution', 'relatedIds']) fd.append(f, pdfBlob(f), `${f}.pdf`);
+  const res = await fetch(base + path, { method: 'POST', body: fd });
+  assert.equal(res.status, 200);
+  const c = db.prepare("SELECT * FROM cases WHERE client_name = 'Family Trust'").get();
+  const factors = JSON.parse(c.risk_breakdown).factors.map((f) => f.factor);
+  assert.ok(factors.includes('PEP among owners / controllers'));
+  assert.ok(factors.includes('Complex / layered ownership'));
+  assert.equal(c.risk_level, 'high');
 });

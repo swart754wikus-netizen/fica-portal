@@ -25,7 +25,8 @@
     <p class="small muted">Resending sends a new link and cancels the old one.</p>
   </div>
 <% } else { %>
-<% if (screening.sanctions.match) { %>
+<% const relScreen = screening.related || []; const relHit = (n, k) => relScreen.find((r) => r.name === n)?.[k]?.match; %>
+<% if (screening.sanctions.match || relScreen.some((r) => r.sanctions?.match)) { %>
   <div class="callout error" role="alert"><strong>Sanctions match.</strong> Do not proceed. Freeze any property, escalate to the compliance officer and report to the FIC (TPR) via goAML without delay. Do not tip off the client.</div>
 <% } %>
 <div class="grid-case">
@@ -52,18 +53,59 @@
     </ul>
   </section>
 
+  <section class="card span2">
+    <h2><%= CLIENT_TYPES[data.clientType]?.label || 'Client' %><%= data.entity ? ': ' + data.entity.name : '' %></h2>
+    <p><strong>Services:</strong> <%= (data.services || []).map((x) => SERVICES[x] || x).join(' · ') || '—' %></p>
+    <% if (data.entity) { const e = data.entity; %>
+      <dl class="kv">
+        <dt>Type</dt><dd><%= ENTITY_SUBTYPES[data.clientType]?.[e.subtype] || e.subtype %></dd>
+        <dt>Registration no.</dt><dd class="mono"><%= e.regNumber %></dd>
+        <dt>Tax no.</dt><dd class="mono"><%= e.taxNumber || '—' %></dd>
+        <dt>Registered address</dt><dd><%= e.address %></dd>
+        <dt>Nature of business</dt><dd><%= e.natureOfBusiness %></dd>
+        <dt>Operates outside SA</dt><dd><%= e.countriesOfOperation || 'No' %></dd>
+        <dt>Cash-intensive</dt><dd><%= e.cashIntensive ? 'Yes' : 'No' %></dd>
+        <dt>Completed by</dt><dd><%= data.firstName %> <%= data.lastName %> (<%= e.capacity %>)</dd>
+      </dl>
+      <h3 style="margin-top:1rem">Owners, directors &amp; controllers</h3>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Name</th><th>ID / passport</th><th>Role</th><th class="num">%</th><th>Nationality</th><th>Screening</th></tr></thead>
+        <tbody>
+        <% for (const p of data.related || []) { %>
+          <tr>
+            <td><%= p.name %><% if (p.isEntity) { %> <span class="pill status-invited">entity — identify its owners</span><% } %></td>
+            <td class="mono small"><%= p.idNumber || '—' %></td>
+            <td><%= ROLES[data.clientType]?.[p.role] || p.role %></td>
+            <td class="num"><%= p.ownership || '' %></td>
+            <td><%= p.nationality %></td>
+            <td>
+              <% if (p.isEntity) { %><span class="small muted">not screened (entity)</span><% } else { %>
+                <%- relHit(p.name, 'sanctions') ? '<span class="pill bad">Sanctions</span>' : '' %>
+                <%- p.pep || relHit(p.name, 'pep') ? '<span class="pill bad">PEP</span>' : '' %>
+                <%- relHit(p.name, 'adverseMedia') ? '<span class="pill bad">Adverse media</span>' : '' %>
+                <%- !relHit(p.name, 'sanctions') && !p.pep && !relHit(p.name, 'pep') && !relHit(p.name, 'adverseMedia') ? '<span class="pill ok">Clear</span>' : '' %>
+              <% } %>
+            </td>
+          </tr>
+        <% } %>
+        </tbody>
+      </table></div>
+    <% } %>
+  </section>
+
   <section class="card">
-    <h2>Client information</h2>
+    <h2><%= data.entity ? 'Person completing the form' : 'Client information' %></h2>
     <dl class="kv">
       <dt>Full name</dt><dd><%= data.firstName %> <%= data.lastName %></dd>
       <dt><%= data.idType === 'sa_id' ? 'SA ID number' : 'Passport number' %></dt><dd class="mono"><%= data.idNumber %></dd>
       <dt>Date of birth</dt><dd><%= data.dateOfBirth %></dd>
       <dt>Nationality / residence</dt><dd><%= data.nationality %> / <%= data.countryOfResidence %></dd>
       <dt>Phone</dt><dd><%= data.phone || '—' %></dd>
+      <dt>Tax no.</dt><dd class="mono"><%= data.taxNumber || '—' %></dd>
       <dt>Address</dt><dd><%= [data.addressLine1, data.addressLine2, data.city, data.province, data.postalCode].filter(Boolean).join(', ') %></dd>
       <dt>Occupation</dt><dd><%= data.occupation %><%= data.employer ? ' — ' + data.employer : '' %></dd>
       <dt>Source of funds</dt><dd><%= data.sourceOfFunds.replace(/_/g, ' ') %></dd>
-      <dt>Expected value</dt><dd>R <%= Number(data.expectedValueZar).toLocaleString('en-ZA') %></dd>
+      <dt>Annual income / turnover</dt><dd>R <%= Number(data.expectedValueZar).toLocaleString('en-ZA') %></dd>
       <dt>Purpose</dt><dd><%= data.purpose %></dd>
       <dt>POPIA consent</dt><dd class="small"><%= data.consent.at %> from <%= data.consent.ip %></dd>
     </dl>

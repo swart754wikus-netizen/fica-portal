@@ -86,5 +86,8 @@ export function openDb(path) {
     CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log
       BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
   `);
+  // Additive migrations for databases created by earlier versions.
+  const caseCols = db.prepare('PRAGMA table_info(cases)').all().map((c) => c.name);
+  if (!caseCols.includes('client_type')) db.exec('ALTER TABLE cases ADD COLUMN client_type TEXT');
   return db;
 }

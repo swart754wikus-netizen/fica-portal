@@ -1,7 +1,18 @@
 # FICA Client Onboarding Portal
 
-Secure digital client onboarding for South African **accountable institutions** (estate agents, attorneys, financial advisers, accountants).
+Secure digital FICA client onboarding for a **chartered accounting firm** (one firm per deployment; set `FIRM_NAME`).
 Clients complete KYC via a single-use link; staff review an explainable risk score and record a defensible decision.
+
+**Built for accounting work:** individuals, companies/CCs, trusts and partnerships; the services the client wants
+(tax, VAT/payroll, bookkeeping, AFS, audit/review, and trust & company services — CIPC registration, secretarial,
+trust administration, acting as director/trustee/nominee, registered address). For entities the client lists every
+director, shareholder (25%+), trustee, founder, beneficiary, partner and controller; each person is screened, and the
+right documents are required per client type (CIPC certificate, Master's letter of authority, trust deed, partnership
+agreement, authority resolution, IDs of the people listed).
+
+> FICA status: since the 2022 amendments, accountants who provide trust and company services are accountable
+> institutions with full CDD, beneficial-ownership, record-keeping and reporting duties. The firm's compliance officer
+> must confirm which of its services are covered and approve `config/rmcp.json` against the firm's RMCP.
 
 **Flow:** Invite → Client details & documents → Screening (identity, sanctions, PEP, adverse media) → Automated RMCP risk score → Risk-based due diligence (SDD / CDD / EDD) → Decision → KYC report
 
@@ -13,7 +24,7 @@ npm run create-staff -- you@firm.co.za "Your Name" compliance   # scan the TOTP 
 npm run dev                   # http://localhost:3000/staff/login
 npm test
 ```
-Mock provider test triggers (surname): `Sanctioned` → sanctions hit, `Politician` → PEP, `Headline` → adverse media.
+Mock provider test triggers (surname, for the client and for every person listed behind an entity): `Sanctioned` → sanctions hit, `Politician` → PEP, `Headline` → adverse media.
 
 ## Security controls
 | Control | Implementation |
@@ -43,5 +54,5 @@ Mock provider test triggers (surname): `Sanctioned` → sanctions hit, `Politici
 3. **Hosting in South Africa** (e.g. AWS af-south-1 / Azure South Africa North) behind TLS; set `NODE_ENV=production`.
 4. **Key management:** load `DATA_KEY` from KMS/Key Vault; plan rotation (ciphertext is version-prefixed).
 5. **PostgreSQL + object storage** instead of SQLite for multi-instance deployment; Redis for rate limits.
-6. **Legal entities & UBO** (companies, trusts — CIPC lookups, ownership trees), liveness/selfie match, ongoing monitoring & periodic re-screening.
+6. **Deeper UBO tracing** (when an owner is itself a company or trust, its owners are flagged but not yet collected in a second form), CIPC/Master's office lookups, liveness/selfie match, ongoing monitoring & periodic re-screening.
 7. Information Officer review of the privacy notice; operator agreements (POPIA s21) with the provider and host; penetration test.

@@ -19,12 +19,13 @@
   <p class="empty">No cases yet. Invite your first client above — they'll receive a secure, single-use link.</p>
 <% } else { %>
   <table>
-    <thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Risk</th><th>Due diligence</th><th>Created</th></tr></thead>
+    <thead><tr><th>Reference</th><th>Client</th><th>Type</th><th>Status</th><th>Risk</th><th>Due diligence</th><th>Created</th></tr></thead>
     <tbody>
     <% for (const c of cases) { %>
       <tr>
         <td><a href="/staff/cases/<%= c.id %>"><%= c.reference %></a></td>
         <td><%= c.client_name %><br><span class="small muted"><%= c.client_email %></span></td>
+        <td class="small"><%= c.client_type ? CLIENT_TYPES[c.client_type]?.label : '—' %></td>
         <td><span class="pill status-<%= c.status %>"><%= c.status %></span></td>
         <td><% if (c.risk_level) { %><span class="pill risk-<%= c.risk_level %>"><%= c.risk_level %> · <%= c.risk_score %></span><% } else { %>—<% } %></td>
         <td><%= c.dd_level || '—' %></td>

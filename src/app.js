@@ -8,6 +8,7 @@ import { clientRouter } from './routes/client.js';
 import { staffRouter } from './routes/staff.js';
 import { getProvider } from './providers/index.js';
 import { getMailer } from './email/index.js';
+import * as catalog from './onboarding/catalog.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -18,6 +19,7 @@ export function createApp({ db, config, provider = getProvider(config.provider),
   app.set('views', join(root, 'views'));
   app.set('trust proxy', config.isProd ? 1 : false);
   app.disable('x-powered-by');
+  Object.assign(app.locals, catalog, { firmName: config.firmName || 'Our firm' });
 
   app.use(helmet({
     contentSecurityPolicy: {

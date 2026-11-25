@@ -1,6 +1,6 @@
 {
-  "_note": "Risk Management & Compliance Programme (RMCP) scoring config. The institution's compliance officer owns these values; they must mirror the approved RMCP document. Country lists must be kept current with FATF / FIC publications.",
-  "version": "2026-11-01",
+  "_note": "Risk Management & Compliance Programme (RMCP) scoring config for a chartered accounting firm. The firm's compliance officer owns these values; they must mirror the approved RMCP document. Country lists must be kept current with FATF / FIC publications. Trust and company service provider (TCSP) work is weighted highest.",
+  "version": "2026-11-25-accounting",
   "weights": {
     "sanctionsMatch": 100,
     "pep": 40,
@@ -11,7 +11,11 @@
     "foreignNational": 10
   },
   "countries": {
-    "highRisk": ["KP", "IR", "MM"],
+    "highRisk": [
+      "KP",
+      "IR",
+      "MM"
+    ],
     "increasedMonitoring": [],
     "highRiskWeight": 40,
     "increasedMonitoringWeight": 20
@@ -27,19 +31,78 @@
     "other": 20
   },
   "occupation": {
-    "highRisk": ["dealer_high_value_goods", "money_service_business", "gambling", "arms_trade", "politician_public_official"],
+    "highRisk": [
+      "dealer_high_value_goods",
+      "money_service_business",
+      "gambling",
+      "arms_trade",
+      "politician_public_official"
+    ],
     "highRiskWeight": 15
   },
   "transactionValueBands": [
-    { "maxZar": 100000, "weight": 0 },
-    { "maxZar": 1000000, "weight": 5 },
-    { "maxZar": 5000000, "weight": 10 },
-    { "maxZar": null, "weight": 20 }
+    {
+      "maxZar": 5000000,
+      "weight": 0
+    },
+    {
+      "maxZar": 50000000,
+      "weight": 5
+    },
+    {
+      "maxZar": null,
+      "weight": 10
+    }
   ],
-  "thresholds": { "medium": 25, "high": 50 },
+  "thresholds": {
+    "medium": 25,
+    "high": 50
+  },
   "dueDiligence": {
-    "low": { "level": "SDD", "label": "Simplified due diligence", "requiresCompliance": false },
-    "medium": { "level": "CDD", "label": "Standard customer due diligence", "requiresCompliance": false },
-    "high": { "level": "EDD", "label": "Enhanced due diligence — senior management approval required", "requiresCompliance": true }
+    "low": {
+      "level": "SDD",
+      "label": "Simplified due diligence",
+      "requiresCompliance": false
+    },
+    "medium": {
+      "level": "CDD",
+      "label": "Standard customer due diligence",
+      "requiresCompliance": false
+    },
+    "high": {
+      "level": "EDD",
+      "label": "Enhanced due diligence \u2014 senior management approval required",
+      "requiresCompliance": true
+    }
+  },
+  "clientType": {
+    "individual": 0,
+    "company": 5,
+    "trust": 15,
+    "partnership": 10
+  },
+  "entitySubtype": {
+    "foreign": 20,
+    "npc": 5
+  },
+  "services": {
+    "tax": 0,
+    "vat_payroll": 0,
+    "bookkeeping": 0,
+    "afs": 0,
+    "audit": 0,
+    "company_registration": 10,
+    "company_secretarial": 10,
+    "trust_services": 15,
+    "nominee": 30,
+    "registered_address": 15
+  },
+  "structure": {
+    "complexStructure": 15,
+    "cashIntensive": 15,
+    "operatesOutsideSA": 10,
+    "relatedPep": 40,
+    "relatedForeignNational": 5,
+    "relatedAdverseMedia": 25
   }
 }

@@ -6,10 +6,10 @@ import { createSession, destroySession, requireStaff, requireRole, csrfCheck } f
 import { rateLimit } from '../security/rateLimit.js';
 import { audit, verifyAuditChain } from '../audit.js';
 import { sendInvite } from '../email/index.js';
+import { DOC_LABELS } from '../onboarding/catalog.js';
 
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60_000;
-const DOC_LABELS = { idDocument: 'Identity document', proofOfAddress: 'Proof of address' };
 
 export function staffRouter({ db, config, mailer }) {
   const r = Router();
@@ -81,7 +81,7 @@ export function staffRouter({ db, config, mailer }) {
 
   r.get('/', (req, res) => {
     const status = ['invited', 'submitted', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : null;
-    const cases = db.prepare(`SELECT id, reference, client_name, client_email, status, risk_level, risk_score, dd_level, created_at, submitted_at
+    const cases = db.prepare(`SELECT id, reference, client_name, client_email, status, client_type, risk_level, risk_score, dd_level, created_at, submitted_at
                               FROM cases ${status ? 'WHERE status = ?' : ''} ORDER BY created_at DESC LIMIT 200`)
       .all(...(status ? [status] : []));
     const counts = Object.fromEntries(db.prepare('SELECT status, COUNT(*) n FROM cases GROUP BY status').all().map((r) => [r.status, r.n]));

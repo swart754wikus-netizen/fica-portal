@@ -10,11 +10,28 @@
 </header>
 <section><h2>1. Client</h2>
 <table>
+  <tr><th>Client type</th><td><%= CLIENT_TYPES[data.clientType]?.label || '—' %></td></tr>
+  <tr><th>Services</th><td><%= (data.services || []).map((x) => SERVICES[x] || x).join(', ') %></td></tr>
+<% if (data.entity) { const e = data.entity; %>
+  <tr><th>Registered name</th><td><%= e.name %> (<%= ENTITY_SUBTYPES[data.clientType]?.[e.subtype] || e.subtype %>)</td></tr>
+  <tr><th>Registration no. / tax no.</th><td><%= e.regNumber %> / <%= e.taxNumber || '—' %></td></tr>
+  <tr><th>Registered address</th><td><%= e.address %></td></tr>
+  <tr><th>Nature of business</th><td><%= e.natureOfBusiness %></td></tr>
+  <tr><th>Outside SA / cash-intensive</th><td><%= e.countriesOfOperation || 'No' %> / <%= e.cashIntensive ? 'Yes' : 'No' %></td></tr>
+</table>
+<h3>Owners, directors &amp; controllers</h3>
+<table><tr><th>Name</th><th>ID / passport</th><th>Role</th><th>%</th><th>Nationality</th><th>PEP</th></tr>
+<% for (const p of data.related || []) { %><tr><td><%= p.name %><%= p.isEntity ? ' (entity)' : '' %></td><td><%= p.idNumber || '—' %></td><td><%= ROLES[data.clientType]?.[p.role] || p.role %></td><td><%= p.ownership || '' %></td><td><%= p.nationality %></td><td><%= p.pep ? 'Yes' : 'No' %></td></tr><% } %>
+</table>
+<h3>Person completing the form (<%= e.capacity %>)</h3>
+<table>
+<% } %>
   <tr><th>Name</th><td><%= data.firstName %> <%= data.lastName %></td></tr>
   <tr><th><%= data.idType === 'sa_id' ? 'SA ID' : 'Passport' %></th><td><%= data.idNumber %></td></tr>
   <tr><th>Date of birth</th><td><%= data.dateOfBirth %></td></tr>
   <tr><th>Nationality / residence</th><td><%= data.nationality %> / <%= data.countryOfResidence %></td></tr>
   <tr><th>Address</th><td><%= [data.addressLine1, data.addressLine2, data.city, data.province, data.postalCode].filter(Boolean).join(', ') %></td></tr>
+  <tr><th>Tax no.</th><td><%= data.taxNumber || '—' %></td></tr>
   <tr><th>Occupation</th><td><%= data.occupation %><%= data.employer ? ' — ' + data.employer : '' %></td></tr>
   <tr><th>Source of funds</th><td><%= data.sourceOfFunds.replace(/_/g, ' ') %></td></tr>
   <tr><th>Purpose of relationship</th><td><%= data.purpose %></td></tr>
@@ -27,7 +44,14 @@
   <tr><th>Sanctions</th><td><%= screening.sanctions.match ? 'MATCH — ' + screening.sanctions.detail : 'No match' %></td></tr>
   <tr><th>PEP</th><td><%= screening.pep.match ? 'MATCH — ' + screening.pep.detail : 'No match' %></td></tr>
   <tr><th>Adverse media</th><td><%= screening.adverseMedia.match ? 'HIT — ' + screening.adverseMedia.detail : 'None found' %></td></tr>
-</table></section>
+</table>
+<% if ((screening.related || []).length) { %>
+<h3>Owners, directors &amp; controllers screened</h3>
+<table><tr><th>Name</th><th>Sanctions</th><th>PEP</th><th>Adverse media</th></tr>
+<% for (const r of screening.related) { %><tr><td><%= r.name %></td><td><%= r.sanctions?.match ? 'MATCH' : 'No match' %></td><td><%= r.pep?.match ? 'MATCH' : 'No match' %></td><td><%= r.adverseMedia?.match ? 'HIT' : 'None' %></td></tr><% } %>
+</table>
+<% } %>
+</section>
 <section><h2>3. Risk assessment (RMCP v<%= risk.rmcpVersion %>)</h2>
 <p><strong>Score <%= risk.score %> — <%= risk.level.toUpperCase() %> RISK — <%= risk.ddLevel %></strong> (<%= risk.ddLabel %>)</p>
 <table><tr><th>Factor</th><th>Detail</th><th>Points</th></tr>

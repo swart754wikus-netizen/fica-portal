@@ -109,3 +109,13 @@ td.num, th.num { text-align: right; }
 .big-check { width: 64px; height: 64px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); font-size: 2rem; display: grid; place-items: center; margin: 0 auto 1rem; }
 @media (max-width: 560px) { .kv { grid-template-columns: 1fr; } .kv dd { margin-bottom: .5rem; } .actions .btn { flex: 1; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Accounting onboarding: client type cards, service checkboxes, related persons */
+.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .6rem; margin-bottom: 1rem; }
+.type-option { display: flex; gap: .6rem; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: .8rem; cursor: pointer; font-weight: 400; margin: 0; }
+.type-option:has(input:checked) { border-color: var(--red); box-shadow: var(--focus); }
+.type-option input { width: 20px; height: 20px; accent-color: var(--red); flex: none; margin-top: .15rem; }
+.type-option strong { display: block; } .type-option small { color: var(--muted); }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .1rem 1rem; }
+.check-grid .check { margin-bottom: .4rem; }
+.related-row { border: 1px solid var(--line); border-radius: 10px; padding: .9rem .9rem .2rem; margin-bottom: .8rem; background: #fbfcfe; }
