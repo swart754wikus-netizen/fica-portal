@@ -8,8 +8,10 @@ import { totp, generateSecret } from '../src/security/totp.js';
 import { verifyAuditChain } from '../src/audit.js';
 import { makeSaId, testKey } from './helpers.js';
 
-const config = { port: 0, baseUrl: 'http://x', isProd: false, dataKey: testKey, inviteTtlHours: 72, sessionTtlMinutes: 30, maxUploadBytes: 5 * 1024 * 1024, retentionYears: 5 };
+const config = { firmName: 'Test Attorneys', port: 0, baseUrl: 'http://x', isProd: false, dataKey: testKey, inviteTtlHours: 72, sessionTtlMinutes: 30, maxUploadBytes: 5 * 1024 * 1024, retentionYears: 5 };
 let server, base, db;
+const sent = [];
+const mailer = { delivers: true, fail: false, async send(m) { if (this.fail) throw Object.assign(new Error('down'), { code: 'ECONNREFUSED' }); sent.push(m); } };
 const staff = {};
 
 function addStaff(email, role) {
@@ -22,7 +24,7 @@ function addStaff(email, role) {
 
 before(async () => {
   db = openDb(':memory:');
-  const app = createApp({ db, config, provider: new MockProvider() });
+  const app = createApp({ db, config, provider: new MockProvider(), mailer });
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}`;
   staff.officer = addStaff('officer@firm.test', 'officer');
@@ -48,8 +50,8 @@ async function login({ email, secret }) {
 
 async function invite(sess, name) {
   const res = await fetch(`${base}/staff/cases`, { method: 'POST', headers: { cookie: sess.cookie }, body: new URLSearchParams({ _csrf: sess.csrf, name, email: 'client@example.com' }) });
-  const html = await res.text();
-  return html.match(/value="http:\/\/x(\/onboard\/[^"]+)"/)[1];
+  await res.text();
+  return sent.at(-1).text.match(/http:\/\/x(\/onboard\/\S+)/)[1];
 }
 
 function clientForm(overrides = {}) {
@@ -164,4 +166,37 @@ test('audit trail is intact and officers cannot view it', async () => {
   const comp = await login(staff.compliance);
   const html = await (await fetch(`${base}/staff/audit`, { headers: { cookie: comp.cookie } })).text();
   assert.match(html, /Hash chain intact/);
+});
+
+test('invite is emailed, link hidden from staff, resend cancels old link', async () => {
+  const sess = await login(staff.officer);
+  const before = sent.length;
+  const res = await fetch(`${base}/staff/cases`, { method: 'POST', headers: { cookie: sess.cookie }, body: new URLSearchParams({ _csrf: sess.csrf, name: 'Mail <b>Test</b>', email: 'mail@example.com' }) });
+  const html = await res.text();
+  assert.match(html, /Invitation emailed/);
+  assert.doesNotMatch(html, /\/onboard\//, 'staff never see the link once email works');
+  const msg = sent[before];
+  assert.equal(msg.to, 'mail@example.com');
+  assert.match(msg.subject, /Test Attorneys/);
+  assert.doesNotMatch(msg.html, /<b>Test/, 'client name is HTML-escaped');
+  const first = msg.text.match(/http:\/\/x(\/onboard\/\S+)/)[1];
+  assert.equal((await fetch(base + first)).status, 200);
+
+  const c = db.prepare("SELECT id FROM cases WHERE client_email = 'mail@example.com'").get();
+  await fetch(`${base}/staff/cases/${c.id}/resend`, { method: 'POST', headers: { cookie: sess.cookie }, body: new URLSearchParams({ _csrf: sess.csrf }) });
+  const second = sent.at(-1).text.match(/http:\/\/x(\/onboard\/\S+)/)[1];
+  assert.notEqual(first, second);
+  assert.equal((await fetch(base + first)).status, 404, 'old link cancelled');
+  assert.equal((await fetch(base + second)).status, 200);
+});
+
+test('email failure falls back to showing the link and is audited', async () => {
+  const sess = await login(staff.officer);
+  mailer.fail = true;
+  try {
+    const html = await (await fetch(`${base}/staff/cases`, { method: 'POST', headers: { cookie: sess.cookie }, body: new URLSearchParams({ _csrf: sess.csrf, name: 'Fail Case', email: 'fail@example.com' }) })).text();
+    assert.match(html, /Email could not be sent/);
+    assert.match(html, /\/onboard\//);
+    assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'invite.email_failed'").get());
+  } finally { mailer.fail = false; }
 });

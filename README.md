@@ -23,7 +23,7 @@ Mock provider test triggers (surname): `Sanctioned` → sanctions hit, `Politici
 | Staff auth | scrypt passwords + mandatory TOTP MFA, lockout after 5 failures, session rotation after MFA, MFA attempt cap |
 | Sessions | Random 256-bit token, stored hashed, HttpOnly + SameSite=Strict + Secure (prod), 30-min sliding expiry |
 | CSRF | Per-session synchroniser token on every staff POST |
-| Client links | 256-bit single-use tokens, stored hashed, expire (72h default), `Referrer-Policy: no-referrer` |
+| Client links | 256-bit single-use tokens, stored hashed, expire (72h default), `Referrer-Policy: no-referrer`; emailed directly to the client (staff never see them), resend cancels the old link |
 | Uploads | Magic-byte sniffing (PDF/JPEG/PNG only), 5 MB cap, never written to disk unencrypted, downloaded as attachment |
 | Headers | Strict CSP (no inline script), HSTS (prod), frame-ancestors none, `Cache-Control: no-store` |
 | Authorisation | Officers can't approve high-risk/EDD clients — compliance role only, with EDD attestation |
@@ -39,7 +39,7 @@ Mock provider test triggers (surname): `Sanctioned` → sanctions hit, `Politici
 
 ## Before production (not done in this MVP)
 1. **Contract a screening provider** and implement an adapter in `src/providers/` (contract in `index.js`). Mock must never run in prod.
-2. **Transactional email** for invite links (TODO in `src/routes/staff.js`).
+2. **Email sending:** set `MAIL_TRANSPORT=smtp` and the `SMTP_*` settings, plus SPF/DKIM/DMARC on the sending domain.
 3. **Hosting in South Africa** (e.g. AWS af-south-1 / Azure South Africa North) behind TLS; set `NODE_ENV=production`.
 4. **Key management:** load `DATA_KEY` from KMS/Key Vault; plan rotation (ciphertext is version-prefixed).
 5. **PostgreSQL + object storage** instead of SQLite for multi-instance deployment; Redis for rate limits.

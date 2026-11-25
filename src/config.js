@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(["'])(.*)\1$/, '$2');
   }
 }
 
@@ -23,5 +23,14 @@ export const config = {
   inviteTtlHours: Number(process.env.INVITE_TTL_HOURS || 72),
   sessionTtlMinutes: 30,
   maxUploadBytes: 5 * 1024 * 1024,
-  retentionYears: 5, // FICA s22/s23: keep CDD records ≥5 years after relationship ends
+  retentionYears: 5,
+  firmName: process.env.FIRM_NAME || 'Our firm',
+  mail: {
+    transport: process.env.MAIL_TRANSPORT || 'log',
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.MAIL_FROM,
+  }, // FICA s22/s23: keep CDD records ≥5 years after relationship ends
 };

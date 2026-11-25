@@ -7,10 +7,11 @@ import { loadSession } from './security/session.js';
 import { clientRouter } from './routes/client.js';
 import { staffRouter } from './routes/staff.js';
 import { getProvider } from './providers/index.js';
+import { getMailer } from './email/index.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-export function createApp({ db, config, provider = getProvider(config.provider), rmcp } = {}) {
+export function createApp({ db, config, provider = getProvider(config.provider), mailer = getMailer(config), rmcp } = {}) {
   rmcp ??= JSON.parse(readFileSync(join(root, 'config/rmcp.json'), 'utf8'));
   const app = express();
   app.set('view engine', 'ejs');
@@ -35,7 +36,7 @@ export function createApp({ db, config, provider = getProvider(config.provider),
   app.get('/privacy', (req, res) => res.render('privacy'));
   app.get('/healthz', (req, res) => res.json({ ok: true }));
   app.use(clientRouter({ db, config, provider, rmcp }));
-  app.use('/staff', staffRouter({ db, config }));
+  app.use('/staff', staffRouter({ db, config, mailer }));
 
   app.use((req, res) => res.status(404).render('error', { message: 'Page not found' }));
   // eslint-disable-next-line no-unused-vars

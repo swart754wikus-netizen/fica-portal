@@ -1,10 +1,21 @@
-<%- include('../partials/head', { title: 'Invitation created' }) %>
+<%- include('../partials/head', { title: 'Invitation' }) %>
 <div class="card narrow">
-  <h1>Invitation created</h1>
-  <p>Case <strong><%= invite.reference %></strong> for <%= invite.email %>.</p>
-  <div class="callout warn small">This link is shown <strong>only once</strong> and is never stored — copy it now. It is single-use and expires automatically.</div>
-  <div class="copy-row"><input readonly value="<%= invite.link %>" id="invite-link" aria-label="Invite link"><button class="btn" data-copy="invite-link" type="button">Copy</button></div>
-  <p class="small muted">Production: wire up transactional email (src/routes/staff.js → TODO) so links go straight to the client.</p>
-  <p><a href="/staff" class="btn ghost">← Back to cases</a></p>
+  <% if (invite.sent) { %>
+    <div class="big-check" aria-hidden="true">✓</div>
+    <h1 class="center">Invitation emailed</h1>
+    <p class="center">A secure, single-use link was sent to <strong><%= invite.email %></strong> for case <strong><%= invite.reference %></strong>.</p>
+    <p class="small muted center">For security, the link is not shown to staff. If the client can't find it, ask them to check spam, then use "Resend invite" on the case — this cancels the old link.</p>
+  <% } else { %>
+    <h1><%= invite.failed ? 'Email could not be sent' : 'Invitation created' %></h1>
+    <p>Case <strong><%= invite.reference %></strong> for <%= invite.email %>.</p>
+    <% if (invite.failed) { %>
+      <div class="callout error small" role="alert">The email server rejected or could not be reached. The details are in the server log. You can send this link to the client yourself, or try "Resend invite" later.</div>
+    <% } else { %>
+      <div class="callout warn small"><strong>Development mode:</strong> email isn't configured (MAIL_TRANSPORT=log), so the link is shown here instead. It is shown only once and never stored.</div>
+    <% } %>
+    <div class="copy-row"><input readonly value="<%= invite.link %>" id="invite-link" aria-label="Invite link"><button class="btn" data-copy="invite-link" type="button">Copy</button></div>
+    <p class="small muted">Only send this link to the client by a channel you trust. Anyone with it can submit on their behalf.</p>
+  <% } %>
+  <p class="actions" style="justify-content:space-between"><a href="/staff" class="btn ghost">← Back to cases</a><a href="/staff/cases/<%= invite.caseId %>" class="btn">View case</a></p>
 </div>
 <%- include('../partials/foot') %>

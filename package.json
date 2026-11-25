@@ -4,7 +4,9 @@
   "private": true,
   "description": "FICA / AML client onboarding portal for South African accountable institutions",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
@@ -16,6 +18,7 @@
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.13"
   }
 }

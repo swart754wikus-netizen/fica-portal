@@ -5,12 +5,13 @@ import { verifyTotp } from '../security/totp.js';
 import { createSession, destroySession, requireStaff, requireRole, csrfCheck } from '../security/session.js';
 import { rateLimit } from '../security/rateLimit.js';
 import { audit, verifyAuditChain } from '../audit.js';
+import { sendInvite } from '../email/index.js';
 
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60_000;
 const DOC_LABELS = { idDocument: 'Identity document', proofOfAddress: 'Proof of address' };
 
-export function staffRouter({ db, config }) {
+export function staffRouter({ db, config, mailer }) {
   const r = Router();
   const loginLimiter = rateLimit({ windowMs: 15 * 60_000, max: 20 });
   const sessOpts = { isProd: config.isProd, ttlMinutes: config.sessionTtlMinutes };
@@ -87,21 +88,44 @@ export function staffRouter({ db, config }) {
     res.render('staff/dashboard', { cases, counts, status, invite: null });
   });
 
-  r.post('/cases', (req, res) => {
+  /** Issues a fresh single-use token (invalidating any previous one) and emails it. */
+  async function issueInvite(req, c) {
+    const token = randomToken();
+    const expiresAt = Date.now() + config.inviteTtlHours * 3_600_000;
+    db.prepare('UPDATE cases SET invite_token_hash = ?, invite_expires_at = ? WHERE id = ?').run(sha256(token), expiresAt, c.id);
+    const link = `${config.baseUrl}/onboard/${token}`;
+    try {
+      await sendInvite(mailer, config, { to: c.client_email, clientName: c.client_name, reference: c.reference, link, expiresAt });
+      audit(db, { actor: actor(req), action: mailer.delivers ? 'invite.emailed' : 'invite.logged', caseId: c.id, ip: req.ip });
+      // Once real email is configured, staff never see the link — it only reaches the client's inbox.
+      return { reference: c.reference, email: c.client_email, caseId: c.id, sent: mailer.delivers, link: mailer.delivers ? null : link };
+    } catch (e) {
+      console.error('Invite email failed:', e.code || e.message);
+      audit(db, { actor: actor(req), action: 'invite.email_failed', caseId: c.id, ip: req.ip, detail: { code: e.code || 'ERROR' } });
+      return { reference: c.reference, email: c.client_email, caseId: c.id, sent: false, failed: true, link };
+    }
+  }
+
+  r.post('/cases', async (req, res) => {
     const name = String(req.body?.name || '').trim().slice(0, 150);
     const email = String(req.body?.email || '').trim().toLowerCase().slice(0, 200);
     if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return res.status(400).render('error', { message: 'Enter the client name and a valid email address.' });
     }
     const id = crypto.randomUUID();
-    const token = randomToken();
     const reference = `KYC-${new Date().getFullYear()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    db.prepare(`INSERT INTO cases (id, reference, client_email, client_name, status, invite_token_hash, invite_expires_at, created_by, created_at)
-                VALUES (?, ?, ?, ?, 'invited', ?, ?, ?, ?)`)
-      .run(id, reference, email, name, sha256(token), Date.now() + config.inviteTtlHours * 3_600_000, req.staff.id, Date.now());
+    db.prepare(`INSERT INTO cases (id, reference, client_email, client_name, status, created_by, created_at)
+                VALUES (?, ?, ?, ?, 'invited', ?, ?)`)
+      .run(id, reference, email, name, req.staff.id, Date.now());
     audit(db, { actor: actor(req), action: 'case.invited', caseId: id, ip: req.ip });
-    // TODO: send via transactional email (e.g. SES/Postmark). The link is shown once and never stored.
-    res.render('staff/invite', { invite: { reference, link: `${config.baseUrl}/onboard/${token}`, email } });
+    res.render('staff/invite', { invite: await issueInvite(req, db.prepare('SELECT * FROM cases WHERE id = ?').get(id)) });
+  });
+
+  r.post('/cases/:id/resend', async (req, res) => {
+    const c = loadCase(req, res); if (!c) return;
+    if (c.status !== 'invited') return res.status(409).render('error', { message: 'This client has already submitted.' });
+    audit(db, { actor: actor(req), action: 'invite.resent', caseId: c.id, ip: req.ip });
+    res.render('staff/invite', { invite: await issueInvite(req, c) });
   });
 
   r.get('/cases/:id', (req, res) => {
