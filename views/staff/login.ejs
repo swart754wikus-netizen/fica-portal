@@ -1,6 +1,7 @@
 <%- include('../partials/head', { title: 'Staff sign in' }) %>
 <form method="post" action="/staff/login" class="card narrow form">
   <h1>Staff sign in</h1>
+  <% if (locals.notice) { %><div class="callout warn small"><%= notice %></div><% } %>
   <% if (error) { %><div class="callout error" role="alert"><%= error %></div><% } %>
   <label>Email<input type="email" name="email" autocomplete="username" required autofocus></label>
   <label>Password<input type="password" name="password" autocomplete="current-password" required></label>

@@ -3,3 +3,8 @@ data/
 .env
 *.db
 *.db-*
+
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*-debug.log

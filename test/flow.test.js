@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb } from '../src/db.js';
+import { sqliteStore } from '../src/store/sqlite.js';
 import { createApp } from '../src/app.js';
 import { MockProvider } from '../src/providers/mock.js';
 import { hashPassword, encrypt } from '../src/security/crypto.js';
@@ -9,7 +9,7 @@ import { verifyAuditChain } from '../src/audit.js';
 import { makeSaId, testKey } from './helpers.js';
 
 const config = { firmName: 'Test Attorneys', port: 0, baseUrl: 'http://x', isProd: false, dataKey: testKey, inviteTtlHours: 72, sessionTtlMinutes: 30, maxUploadBytes: 5 * 1024 * 1024, retentionYears: 5 };
-let server, base, db;
+let server, base, db, store;
 const sent = [];
 const mailer = { delivers: true, fail: false, async send(m) { if (this.fail) throw Object.assign(new Error('down'), { code: 'ECONNREFUSED' }); sent.push(m); } };
 const staff = {};
@@ -23,8 +23,9 @@ function addStaff(email, role) {
 }
 
 before(async () => {
-  db = openDb(':memory:');
-  const app = createApp({ db, config, provider: new MockProvider(), mailer });
+  store = sqliteStore(':memory:');
+  db = store.raw;
+  const app = createApp({ store, config, provider: new MockProvider(), mailer });
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}`;
   staff.officer = addStaff('officer@firm.test', 'officer');
@@ -166,7 +167,7 @@ test('non-PDF/image upload is rejected', async () => {
 });
 
 test('audit trail is intact and officers cannot view it', async () => {
-  assert.deepEqual(verifyAuditChain(db), { ok: true });
+  assert.deepEqual(await verifyAuditChain(store), { ok: true });
   const officer = await login(staff.officer);
   assert.equal((await fetch(`${base}/staff/audit`, { headers: { cookie: officer.cookie } })).status, 403);
   const comp = await login(staff.compliance);

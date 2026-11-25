@@ -16,35 +16,60 @@ agreement, authority resolution, IDs of the people listed).
 
 **Flow:** Invite → Client details & documents → Screening (identity, sanctions, PEP, adverse media) → Automated RMCP risk score → Risk-based due diligence (SDD / CDD / EDD) → Decision → KYC report
 
-## Quick start
+## Architecture
+
+- **Production:** Vercel (Cape Town region) runs the Express app as one serverless function (`api/index.js`).
+  Records live in **Firestore** and documents in **Firebase Storage**, both in Johannesburg (`africa-south1`).
+  Client data, documents and authenticator secrets are AES-256-GCM encrypted by the app (`DATA_KEY`) before they
+  reach Google. Browsers never talk to Firebase directly (`firestore.rules` / `storage.rules` deny everything);
+  documents go up via 15-minute signed URLs locked to one path, file type and size, so phone photos aren't limited
+  by Vercel's 4.5 MB request cap.
+- **Local development & tests:** the same app on a SQLite file (`STORE=sqlite`, the default outside Vercel).
+
+## Local development
+
 ```bash
 npm install
-cp .env.example .env          # then: npm run gen-key  → paste into DATA_KEY
-npm run create-staff -- you@firm.co.za "Your Name" compliance   # scan the TOTP secret into an authenticator app
-npm run dev                   # http://localhost:3000/staff/login
-npm test
+cp .env.example .env          # then: npm run gen-key  → paste into DATA_KEY; set SETUP_TOKEN to any long value
+npm run dev                   # http://localhost:3000/staff/setup  → create the first compliance officer
+npm test                      # 26 tests, no network needed
+cd test-firestore && npm install && npm test   # end-to-end on the Firestore + Storage emulators (needs Java 11+)
 ```
 Mock provider test triggers (surname, for the client and for every person listed behind an entity): `Sanctioned` → sanctions hit, `Politician` → PEP, `Headline` → adverse media.
 
-## Hosting on Render (recommended)
+## Going live on Firebase + Vercel (one firm per project)
 
-`render.yaml` sets everything up: Node 22, a 1 GB permanent disk at `/var/data` for the database and encrypted
-documents, HTTPS, and a randomly generated `DATA_KEY`. On Render: **New → Blueprint → this repo**, enter
-`FIRM_NAME` and `BASE_URL`, deploy, then create staff from the service's **Shell** tab with
-`npm run create-staff -- you@firm.co.za "Your Name" compliance`. Region is Frankfurt (no South African region) —
-state the cross-border transfer in the privacy notice (POPIA s72). Never change `DATA_KEY` after the first deploy:
-existing data could no longer be decrypted. Enable Render's disk snapshots / backups.
+1. **Firebase:** create a **new** project for this firm (never share one with another business).
+   - Firestore Database → Create → *Production mode* → location **africa-south1 (Johannesburg)**.
+   - Storage → Get started → location **africa-south1**. New projects need the **Blaze** (pay-as-you-go) plan for
+     Storage; at a small firm's volume expect a few rand a month — set a budget alert in Google Cloud Billing.
+   - Firestore → Rules: paste `firestore.rules`, Publish. Storage → Rules: paste `storage.rules`, Publish.
+   - Project settings → Service accounts → **Generate new private key** (JSON file — treat as a password).
+2. **Vercel:** Add New → Project → import this repo. Environment Variables:
+   | Key | Value |
+   |---|---|
+   | `DATA_KEY` | 32 random bytes, base64 (see `.env.example`). **Never change it after go-live.** |
+   | `SETUP_TOKEN` | any long random value — used once at `/staff/setup` |
+   | `FIRM_NAME` | the firm's full name |
+   | `BASE_URL` | the site address, e.g. `https://fica.firm.co.za` |
+   | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | from the JSON key (`project_id`, `client_email`, `private_key`) |
+   | `FIREBASE_STORAGE_BUCKET` | from Storage, e.g. `firm-fica.firebasestorage.app` |
+   Deploy. (Vercel's free Hobby plan is for non-commercial use; a firm's live system belongs on Pro.)
+3. Open `BASE_URL/staff/setup`, enter `SETUP_TOKEN`, create the compliance officer, log in and set up the
+   authenticator app. Add other staff under **Team**. Optionally remove `SETUP_TOKEN` afterwards.
+4. The first document upload sets the bucket's CORS rule for `BASE_URL` automatically. If the logs say it couldn't,
+   give the service account the *Storage Admin* role or set CORS manually.
 
 ## Security controls
 | Control | Implementation |
 |---|---|
 | Encryption at rest | AES-256-GCM for all client PII and documents, bound to record ID via AAD (`src/security/crypto.js`) |
 | ID lookups without plaintext | HMAC blind index for duplicate-client detection |
-| Staff auth | scrypt passwords + mandatory TOTP MFA, lockout after 5 failures, session rotation after MFA, MFA attempt cap |
+| Staff auth | scrypt passwords + mandatory TOTP MFA (enrolled at first login, codes single-use), lockout after 5 failures, session rotation after MFA, MFA attempt cap; deactivating a person ends their session |
 | Sessions | Random 256-bit token, stored hashed, HttpOnly + SameSite=Strict + Secure (prod), 30-min sliding expiry |
 | CSRF | Per-session synchroniser token on every staff POST |
 | Client links | 256-bit single-use tokens, stored hashed, expire (72h default), `Referrer-Policy: no-referrer`; emailed directly to the client (staff never see them), resend cancels the old link |
-| Uploads | Magic-byte sniffing (PDF/JPEG/PNG only), 5 MB cap, never written to disk unencrypted, downloaded as attachment |
+| Uploads | Signed, size-capped direct uploads; magic-byte sniffing (PDF/JPEG/PNG only), 10 MB per file; encrypted before storage and the plain upload deleted; downloaded as attachment |
 | Headers | Strict CSP (no inline script), HSTS (prod), frame-ancestors none, `Cache-Control: no-store` |
 | Authorisation | Officers can't approve high-risk/EDD clients — compliance role only, with EDD attestation |
 | Audit | Append-only (DB triggers), SHA-256 hash-chained log of every view, download, decision and login |
@@ -60,8 +85,7 @@ existing data could no longer be decrypted. Enable Render's disk snapshots / bac
 ## Before production (not done in this MVP)
 1. **Contract a screening provider** and implement an adapter in `src/providers/` (contract in `index.js`). Mock must never run in prod.
 2. **Email sending:** set `MAIL_TRANSPORT=smtp` and the `SMTP_*` settings, plus SPF/DKIM/DMARC on the sending domain.
-3. **Hosting in South Africa** (e.g. AWS af-south-1 / Azure South Africa North) behind TLS; set `NODE_ENV=production`.
-4. **Key management:** load `DATA_KEY` from KMS/Key Vault; plan rotation (ciphertext is version-prefixed).
-5. **PostgreSQL + object storage** instead of SQLite for multi-instance deployment; Redis for rate limits.
+3. **Key management:** keep `DATA_KEY` in a password manager as well as Vercel; plan rotation (ciphertext is version-prefixed).
+4. **Backups:** enable Firestore point-in-time recovery / scheduled exports.
 6. **Deeper UBO tracing** (when an owner is itself a company or trust, its owners are flagged but not yet collected in a second form), CIPC/Master's office lookups, liveness/selfie match, ongoing monitoring & periodic re-screening.
 7. Information Officer review of the privacy notice; operator agreements (POPIA s21) with the provider and host; penetration test.

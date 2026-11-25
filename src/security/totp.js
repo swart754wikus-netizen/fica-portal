@@ -37,13 +37,15 @@ export function totp(secret, time = Date.now(), step = 30) {
   return String(code).padStart(6, '0');
 }
 
+/** Returns the matched 30-second time-step (truthy) or null. Callers store it to block replays. */
 export function verifyTotp(secret, code, time = Date.now(), window = 1) {
-  if (!/^\d{6}$/.test(String(code))) return false;
+  if (!/^\d{6}$/.test(String(code))) return null;
+  const now = Math.floor(time / 30_000);
   for (let w = -window; w <= window; w++) {
     const candidate = totp(secret, time + w * 30_000);
-    if (crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(String(code)))) return true;
+    if (crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(String(code)))) return now + w;
   }
-  return false;
+  return null;
 }
 
 export const otpauthUri = (secret, account, issuer = 'FICA Portal') =>

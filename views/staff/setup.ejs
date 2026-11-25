@@ -1,0 +1,12 @@
+<%- include('../partials/head', { title: 'First-time setup' }) %>
+<form method="post" action="/staff/setup" class="card narrow form">
+  <h1>First-time setup</h1>
+  <p class="muted small">Create the first compliance officer account for <%= firmName %>. This page disappears once an account exists.</p>
+  <% if (error) { %><div class="callout error" role="alert"><%= error %></div><% } %>
+  <label>Setup code <span class="muted small">(the SETUP_TOKEN value from Vercel)</span><input name="token" type="password" autocomplete="off" required></label>
+  <label>Your full name<input name="name" value="<%= values.name || '' %>" required></label>
+  <label>Email<input type="email" name="email" value="<%= values.email || '' %>" autocomplete="username" required></label>
+  <label>Password <span class="muted small">(at least 12 characters)</span><input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+  <button class="btn primary block">Create account</button>
+</form>
+<%- include('../partials/foot') %>

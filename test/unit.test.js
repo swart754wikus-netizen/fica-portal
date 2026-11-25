@@ -5,7 +5,7 @@ import { parseSaId } from '../src/validation/saId.js';
 import { encrypt, decrypt, hashPassword, verifyPassword } from '../src/security/crypto.js';
 import { totp, verifyTotp, generateSecret } from '../src/security/totp.js';
 import { assessRisk } from '../src/risk/engine.js';
-import { openDb } from '../src/db.js';
+import { sqliteStore } from '../src/store/sqlite.js';
 import { audit, verifyAuditChain } from '../src/audit.js';
 import { sniffMime } from '../src/routes/client.js';
 import { makeSaId, testKey } from './helpers.js';
@@ -70,15 +70,16 @@ test('risk engine: PEP escalates, sanctions always high', () => {
   assert.ok(s.requiresCompliance);
 });
 
-test('audit chain detects tampering', () => {
-  const db = openDb(':memory:');
-  audit(db, { actor: 'a', action: 'x' });
-  audit(db, { actor: 'b', action: 'y' });
-  assert.deepEqual(verifyAuditChain(db), { ok: true });
+test('audit chain detects tampering', async () => {
+  const store = sqliteStore(':memory:');
+  const db = store.raw;
+  await audit(store, { actor: 'a', action: 'x' });
+  await audit(store, { actor: 'b', action: 'y' });
+  assert.deepEqual(await verifyAuditChain(store), { ok: true });
   assert.throws(() => db.exec("UPDATE audit_log SET actor = 'evil'"), /append-only/);
   db.exec('DROP TRIGGER audit_no_update');
   db.exec("UPDATE audit_log SET actor = 'evil' WHERE id = 1");
-  assert.equal(verifyAuditChain(db).ok, false);
+  assert.equal((await verifyAuditChain(store)).ok, false);
 });
 
 test('file sniffing ignores extension/claimed MIME', () => {

@@ -1,0 +1,37 @@
+<%- include('../partials/head', { title: 'Team' }) %>
+<div class="page-head"><h1>Team</h1></div>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% for (const s of staffList) { const active = s.active !== false && s.active !== 0; %>
+      <tr>
+        <td><%= s.name %></td><td><%= s.email %></td><td><%= s.role %></td>
+        <td><span class="pill <%= active ? 'ok' : 'bad' %>"><%= !active ? 'deactivated' : s.totp_secret_enc ? 'active' : 'awaiting first login' %></span></td>
+        <td class="row-actions">
+          <% if (String(s.id) !== staff.id) { %>
+            <form method="post" action="/staff/team/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" name="action" value="<%= active ? 'deactivate' : 'activate' %>"><%= active ? 'Deactivate' : 'Reactivate' %></button></form>
+          <% } %>
+          <form method="post" action="/staff/team/<%= s.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn" name="action" value="resetMfa" data-confirm="Reset two-step verification? They will set up their authenticator again at next login.">Reset 2-step</button></form>
+        </td>
+      </tr>
+    <% } %>
+    </tbody>
+  </table>
+</div>
+<form method="post" action="/staff/team" class="card form" style="max-width:none">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h2>Add a staff member</h2>
+  <p class="small muted">They log in with this temporary password and set up two-step verification on first login. Give them the password in person or by phone.</p>
+  <% if (error) { %><div class="callout error" role="alert"><%= error %></div><% } %>
+  <div class="grid2">
+    <label>Full name<input name="name" value="<%= values.name || '' %>" required></label>
+    <label>Email<input type="email" name="email" value="<%= values.email || '' %>" required></label>
+  </div>
+  <div class="grid2">
+    <label>Role<select name="role"><option value="officer">Officer — onboards clients, can approve low/medium risk</option><option value="compliance" <%= values.role === 'compliance' ? 'selected' : '' %>>Compliance officer — approves high risk, manages team, audit log</option></select></label>
+    <label>Temporary password <span class="muted small">(12+ characters)</span><input name="password" type="text" autocomplete="off" required></label>
+  </div>
+  <div class="actions"><button class="btn primary">Add staff member</button></div>
+</form>
+<%- include('../partials/foot') %>

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import multer from 'multer';
 import crypto from 'node:crypto';
 import { sha256, encrypt, encryptJson, blindIndex } from '../security/crypto.js';
@@ -161,71 +161,108 @@ export async function screenAll(provider, data, hasProofOfAddress) {
   return { ...main, related };
 }
 
-export function clientRouter({ db, config, provider, rmcp }) {
+export function clientRouter({ store, config, provider, rmcp }) {
   const r = Router();
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: config.maxUploadBytes, files: 20, fields: 200, fieldSize: 2000 },
   }).fields(Object.entries(DOCUMENTS).map(([name, d]) => ({ name, maxCount: d.multiple ? 10 : 1 })));
 
-  const findCase = (token) => {
-    const c = db.prepare("SELECT * FROM cases WHERE invite_token_hash = ? AND status = 'invited'").get(sha256(token));
-    return c && c.invite_expires_at > Date.now() ? c : null;
+  const findCase = async (token) => {
+    const c = await store.getCaseByInviteHash(sha256(String(token)));
+    return c && c.status === 'invited' && c.invite_expires_at > Date.now() ? c : null;
   };
+  const MIMES = ['application/pdf', 'image/jpeg', 'image/png'];
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const view = (extra) => ({ sources: SOURCES_OF_FUNDS, firmName: config.firmName, directUpload: store.supportsDirectUpload, maxUploadMb: config.maxUploadBytes / 1024 / 1024, ...extra });
 
-  r.get('/onboard/:token', (req, res) => {
-    const c = findCase(req.params.token);
+  // Direct-to-storage upload: the browser asks for a short-lived signed URL per file and
+  // uploads it straight to Firebase Storage (no Vercel request-size limit). The server
+  // checks and encrypts the file when the form is submitted.
+  r.post('/onboard/:token/upload-url', express.json({ limit: '4kb' }), async (req, res) => {
+    if (!store.supportsDirectUpload) return res.status(404).json({ error: 'Not available' });
+    const c = await findCase(req.params.token);
+    if (!c) return res.status(404).json({ error: 'This link is no longer valid.' });
+    const { field, contentType, size } = req.body || {};
+    if (!DOCUMENTS[field]) return res.status(400).json({ error: 'Unknown document' });
+    if (!MIMES.includes(contentType)) return res.status(400).json({ error: 'Only PDF, JPEG or PNG files are accepted' });
+    if (!(size > 0 && size <= config.maxUploadBytes)) return res.status(400).json({ error: `Each file must be under ${config.maxUploadBytes / 1024 / 1024} MB` });
+    const { count } = await store.rateHit(`uploads:${c.id}`, 24 * 3_600_000);
+    if (count > 60) return res.status(429).json({ error: 'Too many uploads for this application' });
+    try { await store.ensureUploadCors(new URL(config.baseUrl).origin); } catch (err) {
+      console.error('Could not set Storage CORS — run scripts/setStorageCors.js or grant the service account Storage Admin:', err.message);
+    }
+    const uploadId = crypto.randomUUID();
+    res.json({ uploadId, ...(await store.createUploadUrl(c.id, uploadId, contentType, config.maxUploadBytes)) });
+  });
+
+  /** Merge multipart files and already-uploaded (direct) files into one { field: [{buffer, uploadId?}] } map. */
+  async function collectFiles(c, req) {
+    const files = {};
+    for (const [field, list] of Object.entries(req.files || {})) files[field] = list.map((f) => ({ buffer: f.buffer }));
+    const uploaded = req.body?.uploaded && typeof req.body.uploaded === 'object' ? req.body.uploaded : {};
+    const kept = {};
+    for (const [field, ids] of Object.entries(uploaded)) {
+      if (!DOCUMENTS[field] || !store.supportsDirectUpload) continue;
+      for (const id of [].concat(ids).filter((x) => UUID.test(x)).slice(0, 10)) {
+        const buffer = await store.readUpload(c.id, id);
+        if (!buffer || buffer.length > config.maxUploadBytes) continue;
+        (files[field] ||= []).push({ buffer, uploadId: id });
+        (kept[field] ||= []).push(id);
+      }
+    }
+    return { files, kept };
+  }
+
+  r.get('/onboard/:token', async (req, res) => {
+    const c = await findCase(req.params.token);
     if (!c) return res.status(404).render('client/expired');
-    res.render('client/form', { c, values: { nationality: 'ZA', countryOfResidence: 'ZA', idType: 'sa_id' }, errors: {}, sources: SOURCES_OF_FUNDS, firmName: config.firmName });
+    res.render('client/form', view({ c, token: req.params.token, values: { nationality: 'ZA', countryOfResidence: 'ZA', idType: 'sa_id' }, errors: {}, kept: {} }));
   });
 
   r.post('/onboard/:token', (req, res, next) => {
-    upload(req, res, (err) => {
-      if (err) {
-        const c = findCase(req.params.token);
-        if (!c) return res.status(404).render('client/expired');
-        const msg = err.code === 'LIMIT_FILE_SIZE' ? `Each file must be under ${config.maxUploadBytes / 1024 / 1024} MB` : 'Upload failed';
-        return res.status(400).render('client/form', { c, values: req.body || {}, errors: { form: msg }, sources: SOURCES_OF_FUNDS, firmName: config.firmName });
-      }
-      handleSubmit(req, res).catch(next);
+    upload(req, res, async (err) => {
+      try {
+        if (err) {
+          const c = await findCase(req.params.token);
+          if (!c) return res.status(404).render('client/expired');
+          const msg = err.code === 'LIMIT_FILE_SIZE' ? `Each file must be under ${config.maxUploadBytes / 1024 / 1024} MB` : 'Upload failed';
+          return res.status(400).render('client/form', view({ c, token: req.params.token, values: req.body || {}, errors: { form: msg }, kept: {} }));
+        }
+        await handleSubmit(req, res);
+      } catch (e) { next(e); }
     });
   });
 
   async function handleSubmit(req, res) {
-    const c = findCase(req.params.token);
+    const c = await findCase(req.params.token);
     if (!c) return res.status(404).render('client/expired');
 
-    const { data, docs, errors } = validateSubmission(req.body, req.files);
+    const { files, kept } = await collectFiles(c, req);
+    const { data, docs, errors } = validateSubmission(req.body, files);
     if (Object.keys(errors).length) {
-      return res.status(400).render('client/form', { c, values: req.body, errors, sources: SOURCES_OF_FUNDS, firmName: config.firmName });
+      return res.status(400).render('client/form', view({ c, token: req.params.token, values: req.body, errors, kept }));
     }
 
     const screening = await screenAll(provider, data, docs.some((x) => x.kind === 'proofOfAddress'));
     const risk = assessRisk(data, screening, rmcp);
     const idx = blindIndex(`${data.idType}:${data.idNumber}`, config.dataKey);
-    const duplicate = db.prepare('SELECT reference FROM cases WHERE id_blind_index = ? AND id != ?').get(idx, c.id);
+    const duplicate = await store.findCaseByBlindIndex(idx, c.id);
     const now = Date.now();
-
-    db.exec('BEGIN');
-    try {
-      const consent = { popia: true, declaration: true, at: new Date(now).toISOString(), ip: req.ip, userAgent: str(req.get('user-agent'), 300) };
-      db.prepare(`UPDATE cases SET status = 'submitted', invite_token_hash = NULL, data_enc = ?, id_blind_index = ?,
-                  screening = ?, risk_score = ?, risk_level = ?, dd_level = ?, risk_breakdown = ?, submitted_at = ?, client_type = ?
-                  WHERE id = ?`)
-        .run(encryptJson({ ...data, consent }, config.dataKey, c.id), idx, JSON.stringify(screening),
-          risk.score, risk.level, risk.ddLevel, JSON.stringify(risk), now, data.clientType, c.id);
-      for (const { kind, ...doc } of docs) {
-        const docId = crypto.randomUUID();
-        db.prepare('INSERT INTO documents (id, case_id, kind, mime, size, sha256, blob_enc, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-          .run(docId, c.id, kind, doc.mime, doc.buffer.length, sha256(doc.buffer), encrypt(doc.buffer, config.dataKey, docId), now);
-      }
-      audit(db, { actor: `client:${c.reference}`, action: 'case.submitted', caseId: c.id, ip: req.ip,
-        detail: { riskLevel: risk.level, score: risk.score, provider: screening.provider, duplicateOf: duplicate?.reference } });
-      db.exec('COMMIT');
-    } catch (e) {
-      db.exec('ROLLBACK');
-      throw e;
-    }
+    const consent = { popia: true, declaration: true, at: new Date(now).toISOString(), ip: req.ip, userAgent: str(req.get('user-agent'), 300) };
+    const docRows = docs.map(({ kind, buffer, mime }) => {
+      const id = crypto.randomUUID();
+      return { id, kind, mime, size: buffer.length, sha256: sha256(buffer), blob_enc: encrypt(buffer, config.dataKey, id), created_at: now };
+    });
+    await store.submitCase(c.id, {
+      status: 'submitted', invite_token_hash: null, data_enc: encryptJson({ ...data, consent }, config.dataKey, c.id), id_blind_index: idx,
+      screening: JSON.stringify(screening), risk_score: risk.score, risk_level: risk.level, dd_level: risk.ddLevel,
+      risk_breakdown: JSON.stringify(risk), submitted_at: now, client_type: data.clientType,
+    }, docRows);
+    // Plain-text uploads are removed once their encrypted copies are safely stored.
+    await Promise.all(Object.values(kept).flat().map((id) => store.deleteUpload(c.id, id)));
+    await audit(store, { actor: `client:${c.reference}`, action: 'case.submitted', caseId: c.id, ip: req.ip,
+      detail: { riskLevel: risk.level, score: risk.score, provider: screening.provider, duplicateOf: duplicate?.reference } });
     res.render('client/done', { c });
   }
 

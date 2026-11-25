@@ -22,9 +22,19 @@ export const config = {
   provider: process.env.SCREENING_PROVIDER || 'mock',
   inviteTtlHours: Number(process.env.INVITE_TTL_HOURS || 72),
   sessionTtlMinutes: 30,
-  maxUploadBytes: 5 * 1024 * 1024,
+  maxUploadBytes: 10 * 1024 * 1024, // per file (phone photos); uploads go straight to Storage in production
   retentionYears: 5,
   firmName: process.env.FIRM_NAME || 'Our firm',
+  // "sqlite" = local file (development/tests); "firestore" = Firebase (production on Vercel)
+  store: process.env.STORE || (process.env.VERCEL ? 'firestore' : 'sqlite'),
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  },
+  // One-time code for /staff/setup (create the first compliance officer from the browser).
+  setupToken: process.env.SETUP_TOKEN || '',
   mail: {
     transport: process.env.MAIL_TRANSPORT || 'log',
     host: process.env.SMTP_HOST,

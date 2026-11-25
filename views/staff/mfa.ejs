@@ -1,8 +1,19 @@
-<%- include('../partials/head', { title: 'Two-factor authentication' }) %>
+<%- include('../partials/head', { title: 'Two-step verification' }) %>
 <form method="post" action="/staff/mfa" class="card narrow form">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <h1>Enter your 6-digit code</h1>
-  <p class="muted small">Open your authenticator app.</p>
+  <% if (locals.enroll) { %>
+    <h1>Set up two-step verification</h1>
+    <p class="muted small">Required for access to client FICA records. Install Google Authenticator or Microsoft Authenticator on your phone, then:</p>
+    <ol class="small enroll-steps">
+      <li>Tap <strong>+</strong> → <strong>Enter a setup key</strong> (or tap the link below on your phone).</li>
+      <li>Key: <code class="setup-key"><%= secret %></code></li>
+      <li>Type the 6-digit code the app shows.</li>
+    </ol>
+    <p class="small"><a href="<%= uri %>">Open in authenticator app</a></p>
+  <% } else { %>
+    <h1>Enter your 6-digit code</h1>
+    <p class="muted small">Open your authenticator app.</p>
+  <% } %>
   <% if (error) { %><div class="callout error" role="alert"><%= error %></div><% } %>
   <label>Code<input name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" autocomplete="one-time-code" required autofocus class="otp"></label>
   <button class="btn primary block">Verify</button>
