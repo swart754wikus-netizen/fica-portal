@@ -1,0 +1,21 @@
+{
+  "name": "fica-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FICA / AML client onboarding portal for South African accountable institutions",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "create-staff": "node scripts/create-staff.js",
+    "gen-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2"
+  }
+}

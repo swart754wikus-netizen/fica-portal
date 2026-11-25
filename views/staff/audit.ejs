@@ -1,0 +1,8 @@
+<%- include('../partials/head', { title: 'Audit log' }) %>
+<div class="page-head"><h1>Audit log</h1>
+<% if (chain.ok) { %><span class="pill ok">Hash chain intact</span><% } else { %><span class="pill bad">Tampering detected at entry #<%= chain.brokenAt %></span><% } %></div>
+<div class="card table-wrap"><table class="compact">
+<thead><tr><th>#</th><th>Time</th><th>Actor</th><th>Action</th><th>Case</th><th>IP</th></tr></thead>
+<tbody><% for (const r of rows) { %><tr><td><%= r.id %></td><td class="small"><%= new Date(r.ts).toLocaleString('en-ZA') %></td><td><%= r.actor %></td><td><%= r.action %></td><td><% if (r.case_id) { %><a href="/staff/cases/<%= r.case_id %>">view</a><% } %></td><td class="small mono"><%= r.ip %></td></tr><% } %></tbody>
+</table></div>
+<%- include('../partials/foot') %>

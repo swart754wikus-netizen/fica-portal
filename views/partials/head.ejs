@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= typeof title !== 'undefined' ? title + ' · ' : '' %>Client Onboarding</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="<%= locals.staff ? '/staff' : '/' %>"><span class="brand-mark" aria-hidden="true">✓</span> Secure Onboarding</a>
+    <% if (locals.staff) { %>
+      <nav class="topnav" aria-label="Staff">
+        <a href="/staff">Cases</a>
+        <% if (staff.role === 'compliance') { %><a href="/staff/audit">Audit log</a><% } %>
+        <span class="muted small"><%= staff.name %> · <%= staff.role %></span>
+        <form method="post" action="/staff/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish">Sign out</button></form>
+      </nav>
+    <% } else { %>
+      <span class="secure-badge small">🔒 Encrypted connection</span>
+    <% } %>
+  </div>
+</header>
+<main class="wrap">

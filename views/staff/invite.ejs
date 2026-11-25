@@ -1,0 +1,10 @@
+<%- include('../partials/head', { title: 'Invitation created' }) %>
+<div class="card narrow">
+  <h1>Invitation created</h1>
+  <p>Case <strong><%= invite.reference %></strong> for <%= invite.email %>.</p>
+  <div class="callout warn small">This link is shown <strong>only once</strong> and is never stored — copy it now. It is single-use and expires automatically.</div>
+  <div class="copy-row"><input readonly value="<%= invite.link %>" id="invite-link" aria-label="Invite link"><button class="btn" data-copy="invite-link" type="button">Copy</button></div>
+  <p class="small muted">Production: wire up transactional email (src/routes/staff.js → TODO) so links go straight to the client.</p>
+  <p><a href="/staff" class="btn ghost">← Back to cases</a></p>
+</div>
+<%- include('../partials/foot') %>

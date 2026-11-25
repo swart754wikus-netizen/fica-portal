@@ -1,0 +1,98 @@
+<%
+  const v = values || {};
+  const err = (k) => errors[k] ? `<p class="field-error" id="${k}-err">${errors[k]}</p>` : '';
+  const aria = (k) => errors[k] ? `aria-invalid="true" aria-describedby="${k}-err"` : '';
+  const countries = [['ZA','South Africa'],['BW','Botswana'],['LS','Lesotho'],['MZ','Mozambique'],['NA','Namibia'],['SZ','Eswatini'],['ZW','Zimbabwe'],['ZM','Zambia'],['MW','Malawi'],['AO','Angola'],['NG','Nigeria'],['KE','Kenya'],['GH','Ghana'],['CD','DR Congo'],['GB','United Kingdom'],['US','United States'],['DE','Germany'],['NL','Netherlands'],['PT','Portugal'],['FR','France'],['IN','India'],['CN','China'],['AE','United Arab Emirates'],['AU','Australia'],['IR','Iran'],['KP','North Korea'],['MM','Myanmar'],['XX','Other']];
+  const sel = (name) => countries.map(([c,n]) => `<option value="${c}" ${v[name]===c?'selected':''}>${n}</option>`).join('');
+  const sourceLabels = { salary:'Salary / employment', pension:'Pension / annuity', business_income:'Business income', investments:'Investments / dividends', inheritance:'Inheritance', sale_of_property:'Sale of property or assets', cryptocurrency:'Cryptocurrency', other:'Other' };
+%>
+<%- include('../partials/head', { title: 'Verify your identity' }) %>
+<div class="form-head">
+  <p class="eyebrow">Reference <%= c.reference %></p>
+  <h1>Hi <%= c.client_name.split(' ')[0] %>, let's verify your identity</h1>
+  <p class="muted">Takes about 5 minutes. Have your ID document and a proof of address (less than 3 months old) ready.</p>
+</div>
+
+<% if (Object.keys(errors).length) { %>
+  <div class="callout error" role="alert" tabindex="-1" data-focus><strong>Please fix the highlighted fields.</strong><% if (errors.form) { %> <%= errors.form %><% } %></div>
+<% } %>
+
+<form method="post" enctype="multipart/form-data" class="card form" novalidate>
+  <fieldset>
+    <legend><span class="step-num">1</span> Personal details</legend>
+    <div class="grid2">
+      <label>First names<input name="firstName" value="<%= v.firstName || '' %>" autocomplete="given-name" required <%- aria('firstName') %>><%- err('firstName') %></label>
+      <label>Surname<input name="lastName" value="<%= v.lastName || '' %>" autocomplete="family-name" required <%- aria('lastName') %>><%- err('lastName') %></label>
+    </div>
+    <div class="radio-row" role="radiogroup" aria-label="Identity document type">
+      <label class="radio"><input type="radio" name="idType" value="sa_id" <%= v.idType !== 'passport' ? 'checked' : '' %> data-toggle-idtype> South African ID</label>
+      <label class="radio"><input type="radio" name="idType" value="passport" <%= v.idType === 'passport' ? 'checked' : '' %> data-toggle-idtype> Passport</label>
+    </div>
+    <div class="grid2">
+      <label>ID / passport number<input name="idNumber" value="<%= v.idNumber || '' %>" inputmode="numeric" autocomplete="off" required <%- aria('idNumber') %>><%- err('idNumber') %></label>
+      <label data-passport-only <%= v.idType === 'passport' ? '' : 'hidden' %>>Date of birth<input type="date" name="dateOfBirth" value="<%= v.dateOfBirth || '' %>" <%- aria('dateOfBirth') %>><%- err('dateOfBirth') %></label>
+    </div>
+    <div class="grid2">
+      <label>Nationality<select name="nationality" <%- aria('nationality') %>><%- sel('nationality') %></select><%- err('nationality') %></label>
+      <label>Mobile number<input name="phone" type="tel" value="<%= v.phone || '' %>" autocomplete="tel" placeholder="+27 82 000 0000" <%- aria('phone') %>><%- err('phone') %></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step-num">2</span> Residential address</legend>
+    <label>Street address<input name="addressLine1" value="<%= v.addressLine1 || '' %>" autocomplete="address-line1" required <%- aria('addressLine1') %>><%- err('addressLine1') %></label>
+    <label>Suburb / complex <span class="muted">(optional)</span><input name="addressLine2" value="<%= v.addressLine2 || '' %>" autocomplete="address-line2"></label>
+    <div class="grid3">
+      <label>City<input name="city" value="<%= v.city || '' %>" autocomplete="address-level2" required <%- aria('city') %>><%- err('city') %></label>
+      <label>Province<input name="province" value="<%= v.province || '' %>" autocomplete="address-level1"></label>
+      <label>Postal code<input name="postalCode" value="<%= v.postalCode || '' %>" autocomplete="postal-code" inputmode="numeric" required <%- aria('postalCode') %>><%- err('postalCode') %></label>
+    </div>
+    <label>Country of residence<select name="countryOfResidence" <%- aria('countryOfResidence') %>><%- sel('countryOfResidence') %></select><%- err('countryOfResidence') %></label>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step-num">3</span> Occupation &amp; source of funds</legend>
+    <div class="grid2">
+      <label>Occupation<input name="occupation" value="<%= v.occupation || '' %>" required <%- aria('occupation') %>><%- err('occupation') %></label>
+      <label>Employer / business name <span class="muted">(optional)</span><input name="employer" value="<%= v.employer || '' %>" autocomplete="organization"></label>
+    </div>
+    <div class="grid2">
+      <label>Main source of funds
+        <select name="sourceOfFunds" <%- aria('sourceOfFunds') %>>
+          <option value="">Select…</option>
+          <% for (const s of sources) { %><option value="<%= s %>" <%= v.sourceOfFunds === s ? 'selected' : '' %>><%= sourceLabels[s] %></option><% } %>
+        </select><%- err('sourceOfFunds') %>
+      </label>
+      <label>Expected transaction value (ZAR)<input name="expectedValueZar" value="<%= v.expectedValueZar || '' %>" inputmode="numeric" placeholder="e.g. 1 500 000"></label>
+    </div>
+    <label>Purpose of the business relationship<textarea name="purpose" rows="2" required <%- aria('purpose') %>><%= v.purpose || '' %></textarea><%- err('purpose') %></label>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step-num">4</span> Public position</legend>
+    <p class="small muted">Are you, or a close family member or associate, a prominent public official (e.g. government minister, judge, senior military officer, head of a state-owned company, senior political party official) in South Africa or abroad?</p>
+    <div class="radio-row" <%- aria('pepDeclared') %>>
+      <label class="radio"><input type="radio" name="pepDeclared" value="no" <%= v.pepDeclared === 'no' ? 'checked' : '' %> data-toggle-pep> No</label>
+      <label class="radio"><input type="radio" name="pepDeclared" value="yes" <%= v.pepDeclared === 'yes' ? 'checked' : '' %> data-toggle-pep> Yes</label>
+    </div><%- err('pepDeclared') %>
+    <label data-pep-only <%= v.pepDeclared === 'yes' ? '' : 'hidden' %>>Position held and by whom<textarea name="pepDetails" rows="2" <%- aria('pepDetails') %>><%= v.pepDetails || '' %></textarea><%- err('pepDetails') %></label>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step-num">5</span> Documents</legend>
+    <p class="small muted">PDF, JPG or PNG, max 5 MB each. Make sure all four corners are visible and the text is readable.</p>
+    <div class="grid2">
+      <label class="upload">Identity document (ID card both sides, ID book or passport)<input type="file" name="idDocument" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required <%- aria('idDocument') %>><%- err('idDocument') %></label>
+      <label class="upload">Proof of address (utility bill, bank statement, lease)<input type="file" name="proofOfAddress" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required <%- aria('proofOfAddress') %>><%- err('proofOfAddress') %></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend><span class="step-num">6</span> Consent &amp; declaration</legend>
+    <label class="check"><input type="checkbox" name="consent" <%- aria('consent') %>> <span>I consent to my personal information being processed and verified with third-party bureaus for FICA purposes, as described in the <a href="/privacy" target="_blank" rel="noopener">privacy notice</a>.</span></label><%- err('consent') %>
+    <label class="check"><input type="checkbox" name="declaration" <%- aria('declaration') %>> <span>I declare that the information I have provided is true and correct, and I will inform you of any changes.</span></label><%- err('declaration') %>
+  </fieldset>
+
+  <div class="actions"><button class="btn primary" type="submit" data-submit>Submit securely</button></div>
+</form>
+<%- include('../partials/foot') %>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en-ZA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>KYC Report <%= c.reference %></title><link rel="stylesheet" href="/static/report.css"><script src="/static/app.js" defer></script></head>
+<body>
+<div class="toolbar no-print"><button data-print>Print / Save as PDF</button></div>
+<header>
+  <h1>Know Your Customer Report</h1>
+  <p><strong><%= c.reference %></strong> · Generated <%= generatedAt.toLocaleString('en-ZA') %> by <%= generatedBy.name %></p>
+  <p class="conf">CONFIDENTIAL — contains personal information protected under POPIA</p>
+</header>
+<section><h2>1. Client</h2>
+<table>
+  <tr><th>Name</th><td><%= data.firstName %> <%= data.lastName %></td></tr>
+  <tr><th><%= data.idType === 'sa_id' ? 'SA ID' : 'Passport' %></th><td><%= data.idNumber %></td></tr>
+  <tr><th>Date of birth</th><td><%= data.dateOfBirth %></td></tr>
+  <tr><th>Nationality / residence</th><td><%= data.nationality %> / <%= data.countryOfResidence %></td></tr>
+  <tr><th>Address</th><td><%= [data.addressLine1, data.addressLine2, data.city, data.province, data.postalCode].filter(Boolean).join(', ') %></td></tr>
+  <tr><th>Occupation</th><td><%= data.occupation %><%= data.employer ? ' — ' + data.employer : '' %></td></tr>
+  <tr><th>Source of funds</th><td><%= data.sourceOfFunds.replace(/_/g, ' ') %></td></tr>
+  <tr><th>Purpose of relationship</th><td><%= data.purpose %></td></tr>
+  <tr><th>PEP self-declaration</th><td><%= data.pepDeclared ? 'Yes — ' + data.pepDetails : 'No' %></td></tr>
+</table></section>
+<section><h2>2. Screening (<%= screening.provider %>, ref <%= screening.reference %>, <%= screening.checkedAt %>)</h2>
+<table>
+  <tr><th>Identity</th><td><%= screening.identity.verified ? 'Verified' : 'NOT verified' %></td></tr>
+  <tr><th>Address</th><td><%= screening.address.verified ? 'Verified' : 'NOT verified' %></td></tr>
+  <tr><th>Sanctions</th><td><%= screening.sanctions.match ? 'MATCH — ' + screening.sanctions.detail : 'No match' %></td></tr>
+  <tr><th>PEP</th><td><%= screening.pep.match ? 'MATCH — ' + screening.pep.detail : 'No match' %></td></tr>
+  <tr><th>Adverse media</th><td><%= screening.adverseMedia.match ? 'HIT — ' + screening.adverseMedia.detail : 'None found' %></td></tr>
+</table></section>
+<section><h2>3. Risk assessment (RMCP v<%= risk.rmcpVersion %>)</h2>
+<p><strong>Score <%= risk.score %> — <%= risk.level.toUpperCase() %> RISK — <%= risk.ddLevel %></strong> (<%= risk.ddLabel %>)</p>
+<table><tr><th>Factor</th><th>Detail</th><th>Points</th></tr>
+<% for (const f of risk.factors) { %><tr><td><%= f.factor %></td><td><%= f.note || '' %></td><td>+<%= f.points %></td></tr><% } %></table></section>
+<section><h2>4. Documents on file</h2>
+<table><tr><th>Document</th><th>Type</th><th>SHA-256</th></tr>
+<% for (const d of docs) { %><tr><td><%= DOC_LABELS[d.kind] %></td><td><%= d.mime %></td><td class="mono"><%= d.sha256 %></td></tr><% } %></table></section>
+<section><h2>5. Decision</h2>
+<% if (decidedBy) { %>
+<p><strong><%= c.status.toUpperCase() %></strong> by <%= decidedBy.name %> (<%= decidedBy.role %>) on <%= new Date(c.decided_at).toLocaleString('en-ZA') %></p>
+<p><%= c.decision_reason %></p>
+<p>Records retained until <%= new Date(c.retention_until).toLocaleDateString('en-ZA') %> (FICA s22–s23).</p>
+<% } else { %><p>Pending review.</p><% } %>
+<p>POPIA consent captured <%= data.consent.at %>.</p>
+</section>
+</body></html>

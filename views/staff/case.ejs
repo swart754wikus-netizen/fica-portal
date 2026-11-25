@@ -1,0 +1,103 @@
+<%
+  const fmt = (ts) => ts ? new Date(ts).toLocaleString('en-ZA') : '—';
+  const check = (ok, good, bad) => `<span class="pill ${ok ? 'ok' : 'bad'}">${ok ? good : bad}</span>`;
+%>
+<%- include('../partials/head', { title: c.reference }) %>
+<p><a href="/staff">← Cases</a></p>
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><%= c.reference %></p>
+    <h1><%= c.client_name %></h1>
+    <p class="muted"><%= c.client_email %> · <span class="pill status-<%= c.status %>"><%= c.status %></span></p>
+  </div>
+  <% if (data) { %><a class="btn" href="/staff/cases/<%= c.id %>/report" target="_blank" rel="noopener">KYC report ↗</a><% } %>
+</div>
+
+<% if (!data) { %>
+  <div class="card"><p>Waiting for the client to complete onboarding. Invite expires <%= fmt(c.invite_expires_at) %>.</p></div>
+<% } else { %>
+<% if (screening.sanctions.match) { %>
+  <div class="callout error" role="alert"><strong>Sanctions match.</strong> Do not proceed. Freeze any property, escalate to the compliance officer and report to the FIC (TPR) via goAML without delay. Do not tip off the client.</div>
+<% } %>
+<div class="grid-case">
+  <section class="card">
+    <h2>Risk assessment</h2>
+    <div class="risk-head">
+      <div class="score risk-<%= risk.level %>"><span><%= risk.score %></span><small><%= risk.level %> risk</small></div>
+      <div><strong><%= risk.ddLevel %></strong> — <%= risk.ddLabel %><br><span class="small muted">RMCP config v<%= risk.rmcpVersion %></span></div>
+    </div>
+    <table class="compact">
+      <thead><tr><th>Factor</th><th class="num">Points</th></tr></thead>
+      <tbody><% for (const f of risk.factors) { %><tr><td><%= f.factor %><% if (f.note) { %><br><span class="small muted"><%= String(f.note).replace(/_/g, ' ') %></span><% } %></td><td class="num">+<%= f.points %></td></tr><% } %></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Screening <span class="small muted">(<%= screening.provider %> · <%= fmt(Date.parse(screening.checkedAt)) %>)</span></h2>
+    <ul class="checks">
+      <li>Identity <%- check(screening.identity.verified, 'Verified', 'Not verified') %> <span class="small muted"><%= screening.identity.detail %></span></li>
+      <li>Address <%- check(screening.address.verified, 'Verified', 'Not verified') %></li>
+      <li>Sanctions <%- check(!screening.sanctions.match, 'Clear', 'MATCH') %> <span class="small muted"><%= screening.sanctions.detail || '' %></span></li>
+      <li>PEP <%- check(!screening.pep.match && !data.pepDeclared, 'Clear', 'PEP') %> <span class="small muted"><%= screening.pep.detail || (data.pepDeclared ? 'Self-declared: ' + data.pepDetails : '') %></span></li>
+      <li>Adverse media <%- check(!screening.adverseMedia.match, 'Clear', 'Hit') %> <span class="small muted"><%= screening.adverseMedia.detail || '' %></span></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Client information</h2>
+    <dl class="kv">
+      <dt>Full name</dt><dd><%= data.firstName %> <%= data.lastName %></dd>
+      <dt><%= data.idType === 'sa_id' ? 'SA ID number' : 'Passport number' %></dt><dd class="mono"><%= data.idNumber %></dd>
+      <dt>Date of birth</dt><dd><%= data.dateOfBirth %></dd>
+      <dt>Nationality / residence</dt><dd><%= data.nationality %> / <%= data.countryOfResidence %></dd>
+      <dt>Phone</dt><dd><%= data.phone || '—' %></dd>
+      <dt>Address</dt><dd><%= [data.addressLine1, data.addressLine2, data.city, data.province, data.postalCode].filter(Boolean).join(', ') %></dd>
+      <dt>Occupation</dt><dd><%= data.occupation %><%= data.employer ? ' — ' + data.employer : '' %></dd>
+      <dt>Source of funds</dt><dd><%= data.sourceOfFunds.replace(/_/g, ' ') %></dd>
+      <dt>Expected value</dt><dd>R <%= Number(data.expectedValueZar).toLocaleString('en-ZA') %></dd>
+      <dt>Purpose</dt><dd><%= data.purpose %></dd>
+      <dt>POPIA consent</dt><dd class="small"><%= data.consent.at %> from <%= data.consent.ip %></dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Documents</h2>
+    <ul class="docs">
+      <% for (const d of docs) { %>
+        <li><a href="/staff/cases/<%= c.id %>/documents/<%= d.id %>"><%= DOC_LABELS[d.kind] %></a> <span class="small muted"><%= d.mime %> · <%= Math.round(d.size / 1024) %> KB · sha256 <%= d.sha256.slice(0, 12) %>…</span></li>
+      <% } %>
+    </ul>
+    <p class="small muted">Downloads are logged against your name.</p>
+  </section>
+
+  <section class="card span2">
+    <h2>Decision</h2>
+    <% if (c.status === 'submitted') { %>
+      <form method="post" action="/staff/cases/<%= c.id %>/decision" class="form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <% if (risk.requiresCompliance && staff.role !== 'compliance') { %>
+          <div class="callout warn small">High risk — only a compliance officer can approve. You may still reject.</div>
+        <% } %>
+        <% if (risk.ddLevel === 'EDD') { %>
+          <label class="check"><input type="checkbox" name="eddConfirmed"> <span>Enhanced due diligence completed: source of wealth verified, senior management approval obtained, ongoing monitoring set.</span></label>
+        <% } %>
+        <label>Reason / notes (kept on record)<textarea name="reason" rows="3" required minlength="10"></textarea></label>
+        <div class="actions">
+          <button class="btn danger" name="decision" value="rejected">Reject</button>
+          <button class="btn primary" name="decision" value="approved" <%= risk.requiresCompliance && staff.role !== 'compliance' ? 'disabled' : '' %>>Approve client</button>
+        </div>
+      </form>
+    <% } else { %>
+      <p><span class="pill status-<%= c.status %>"><%= c.status %></span> by <%= decidedBy %> on <%= fmt(c.decided_at) %></p>
+      <p><%= c.decision_reason %></p>
+      <p class="small muted">Retain records until <%= fmt(c.retention_until) %>.</p>
+    <% } %>
+  </section>
+</div>
+<% } %>
+
+<section class="card">
+  <h2>Activity</h2>
+  <ol class="timeline small"><% for (const h of history) { %><li><span class="muted"><%= fmt(h.ts) %></span> <%= h.action %> — <%= h.actor %></li><% } %></ol>
+</section>
+<%- include('../partials/foot') %>

@@ -1,0 +1,38 @@
+<%- include('../partials/head', { title: 'Cases' }) %>
+<div class="page-head">
+  <h1>Onboarding cases</h1>
+  <form method="post" action="/staff/cases" class="inline-form card">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input name="name" placeholder="Client full name" required aria-label="Client full name">
+    <input name="email" type="email" placeholder="client@email.com" required aria-label="Client email">
+    <button class="btn primary">+ Invite client</button>
+  </form>
+</div>
+<nav class="tabs" aria-label="Filter by status">
+  <a href="/staff" class="<%= !status ? 'active' : '' %>">All</a>
+  <% for (const s of ['submitted','invited','approved','rejected']) { %>
+    <a href="/staff?status=<%= s %>" class="<%= status === s ? 'active' : '' %>"><%= s === 'submitted' ? 'Awaiting review' : s[0].toUpperCase() + s.slice(1) %> <span class="count"><%= counts[s] || 0 %></span></a>
+  <% } %>
+</nav>
+<div class="card table-wrap">
+<% if (!cases.length) { %>
+  <p class="empty">No cases yet. Invite your first client above — they'll receive a secure, single-use link.</p>
+<% } else { %>
+  <table>
+    <thead><tr><th>Reference</th><th>Client</th><th>Status</th><th>Risk</th><th>Due diligence</th><th>Created</th></tr></thead>
+    <tbody>
+    <% for (const c of cases) { %>
+      <tr>
+        <td><a href="/staff/cases/<%= c.id %>"><%= c.reference %></a></td>
+        <td><%= c.client_name %><br><span class="small muted"><%= c.client_email %></span></td>
+        <td><span class="pill status-<%= c.status %>"><%= c.status %></span></td>
+        <td><% if (c.risk_level) { %><span class="pill risk-<%= c.risk_level %>"><%= c.risk_level %> · <%= c.risk_score %></span><% } else { %>—<% } %></td>
+        <td><%= c.dd_level || '—' %></td>
+        <td class="small"><%= new Date(c.created_at).toLocaleDateString('en-ZA') %></td>
+      </tr>
+    <% } %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('../partials/foot') %>
