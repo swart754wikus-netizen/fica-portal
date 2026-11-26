@@ -10,10 +10,15 @@
     <h1><%= c.client_name %></h1>
     <p class="muted"><%= c.client_email %> · <span class="pill status-<%= c.status %>"><%= c.status %></span></p>
   </div>
-  <% if (data) { %><a class="btn" href="/staff/cases/<%= c.id %>/report" target="_blank" rel="noopener">KYC report ↗</a><% } %>
+  <% if (data && !locals.limited) { %><a class="btn" href="/staff/cases/<%= c.id %>/report" target="_blank" rel="noopener">KYC report ↗</a><% } %>
 </div>
 
-<% if (!data) { %>
+<% if (locals.limited && c.status !== 'invited') { %>
+  <div class="card">
+    <p><strong><%= { submitted: 'Submitted', approved: 'Approved', rejected: 'Not approved' }[c.status] %></strong><% if (c.submitted_at) { %> — client submitted on <%= fmtDate(c.submitted_at) %><% } %>.</p>
+    <p class="small muted">Client details and documents are only visible to FICA officers and compliance officers.</p>
+  </div>
+<% } else if (!data) { %>
   <div class="card waiting">
     <% const expired = !c.invite_expires_at || c.invite_expires_at < Date.now(); %>
     <p><%= expired ? 'The invitation has expired.' : 'Waiting for the client to complete onboarding.' %>

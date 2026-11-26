@@ -87,3 +87,23 @@ test('team: compliance adds an officer; deactivation ends their session; MFA res
   assert.ok(again.cookie);
   assert.notEqual(again.secret, officer.secret, 'new authenticator secret after reset');
 });
+
+test('administrator: sends invites and sees progress, but no client data, documents, report or decisions', async () => {
+  await post('/staff/team', { _csrf: admin.csrf, name: 'Nadine', email: 'hr@firm.co.za', role: 'admin', password: 'temporary-password-2' }, admin.cookie);
+  let hr = await login('hr@firm.co.za', 'temporary-password-2');
+  const pw = await (await fetch(base + '/staff/password', { headers: { cookie: hr.cookie } })).text();
+  await post('/staff/password', { _csrf: csrfOf(pw), currentPassword: 'temporary-password-2', newPassword: 'nadine-own-password', confirmPassword: 'nadine-own-password' }, hr.cookie);
+  const dash = await (await fetch(base + '/staff', { headers: { cookie: hr.cookie } })).text();
+  assert.doesNotMatch(dash, /<th>Risk<\/th>/, 'no risk column');
+  const inv = await post('/staff/cases', { _csrf: csrfOf(dash), name: 'Client From HR', email: 'client@x.co.za' }, hr.cookie);
+  assert.equal(inv.status, 200, 'can send invites');
+  const c = (await store.listCases({ limit: 10 })).find((x) => x.client_name === 'Client From HR');
+  await store.updateCase(c.id, { status: 'submitted', submitted_at: Date.now() });
+  const page = await (await fetch(`${base}/staff/cases/${c.id}`, { headers: { cookie: hr.cookie } })).text();
+  assert.match(page, /only visible to FICA officers/);
+  assert.equal((await fetch(`${base}/staff/cases/${c.id}/report`, { headers: { cookie: hr.cookie } })).status, 403);
+  assert.equal((await fetch(`${base}/staff/cases/${c.id}/documents/x`, { headers: { cookie: hr.cookie } })).status, 403);
+  assert.equal((await post(`/staff/cases/${c.id}/decision`, { _csrf: csrfOf(dash), decision: 'approved', reason: 'trying as admin' }, hr.cookie)).status, 403);
+  assert.equal((await fetch(base + '/staff/team', { headers: { cookie: hr.cookie } })).status, 403);
+  assert.equal((await fetch(base + '/staff/audit', { headers: { cookie: hr.cookie } })).status, 403);
+});

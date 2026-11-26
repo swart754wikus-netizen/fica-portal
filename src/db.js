@@ -15,7 +15,7 @@ export function openDb(path) {
       id INTEGER PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('officer','compliance')),
+      role TEXT NOT NULL CHECK (role IN ('officer','compliance','admin')),
       password_hash TEXT NOT NULL,
       totp_secret_enc BLOB NOT NULL,
       failed_logins INTEGER NOT NULL DEFAULT 0,
@@ -94,6 +94,18 @@ export function openDb(path) {
   if (!staffCols.includes('pending_totp_enc')) db.exec('ALTER TABLE staff ADD COLUMN pending_totp_enc BLOB');
   if (!staffCols.includes('must_change_password')) db.exec('ALTER TABLE staff ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
   if (!staffCols.includes('totp_last_counter')) db.exec('ALTER TABLE staff ADD COLUMN totp_last_counter INTEGER NOT NULL DEFAULT 0');
+  // Older local databases only allowed officer/compliance: rebuild the staff table to allow 'admin'.
+  const staffSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'staff'").get().sql;
+  if (!staffSql.includes("'admin'")) {
+    const cols = db.prepare('PRAGMA table_info(staff)').all().map((c) => c.name).join(', ');
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('BEGIN');
+    db.exec('ALTER TABLE staff RENAME TO staff_old');
+    db.exec(staffSql.replace("('officer','compliance')", "('officer','compliance','admin')").replace(/CREATE TABLE "?staff_old"?/, 'CREATE TABLE staff'));
+    db.exec(`INSERT INTO staff (${cols}) SELECT ${cols} FROM staff_old; DROP TABLE staff_old;`);
+    db.exec('COMMIT');
+    db.exec('PRAGMA foreign_keys = ON');
+  }
   db.exec('CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset INTEGER NOT NULL)');
   return db;
 }

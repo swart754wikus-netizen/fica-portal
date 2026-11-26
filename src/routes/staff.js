@@ -187,8 +187,17 @@ export function staffRouter({ store, config, mailer }) {
     res.render('staff/invite', { invite: await issueInvite(req, c) });
   });
 
+  // Administrators send invites and track progress only: no client details, documents,
+  // risk ratings or decisions (need-to-know; avoids tipping-off risk).
+  const notAdmin = (req, res, next) => (req.staff.role === 'admin'
+    ? res.status(403).render('error', { message: 'Your role can send invites and track progress, but not open client records.' })
+    : next());
+
   r.get('/cases/:id', async (req, res) => {
     const c = await loadCase(req, res); if (!c) return;
+    if (req.staff.role === 'admin') {
+      return res.render('staff/case', { c, data: null, docs: [], history: [], DOC_LABELS, decidedBy: null, screening: null, risk: null, limited: true });
+    }
     const data = c.data_enc ? decryptJson(c.data_enc, config.dataKey, c.id) : null;
     const [docs, history, decidedBy] = await Promise.all([store.listDocuments(c.id), store.listAudit({ caseId: c.id }), staffName(c.decided_by)]);
     await audit(store, { actor: actor(req), action: 'case.viewed', caseId: c.id, ip: req.ip });
@@ -199,7 +208,7 @@ export function staffRouter({ store, config, mailer }) {
     });
   });
 
-  r.get('/cases/:id/documents/:docId', async (req, res) => {
+  r.get('/cases/:id/documents/:docId', notAdmin, async (req, res) => {
     const doc = await store.getDocument(req.params.id, req.params.docId);
     if (!doc) return res.status(404).render('error', { message: 'Document not found' });
     const buf = decrypt(await store.getDocumentBlob(doc), config.dataKey, doc.id);
@@ -213,7 +222,7 @@ export function staffRouter({ store, config, mailer }) {
     }).send(buf);
   });
 
-  r.post('/cases/:id/decision', async (req, res) => {
+  r.post('/cases/:id/decision', notAdmin, async (req, res) => {
     const c = await loadCase(req, res); if (!c) return;
     if (c.status !== 'submitted') return res.status(409).render('error', { message: 'This case is not awaiting a decision.' });
     const decision = req.body?.decision;
@@ -236,7 +245,7 @@ export function staffRouter({ store, config, mailer }) {
     res.redirect(`/staff/cases/${c.id}`);
   });
 
-  r.get('/cases/:id/report', async (req, res) => {
+  r.get('/cases/:id/report', notAdmin, async (req, res) => {
     const c = await loadCase(req, res); if (!c) return;
     if (!c.data_enc) return res.status(409).render('error', { message: 'The client has not submitted yet.' });
     await audit(store, { actor: actor(req), action: 'report.generated', caseId: c.id, ip: req.ip });
@@ -260,7 +269,7 @@ export function staffRouter({ store, config, mailer }) {
   });
 
   r.post('/team', requireRole('compliance'), async (req, res) => {
-    const v = { name: String(req.body?.name || '').trim().slice(0, 100), email: String(req.body?.email || '').trim().toLowerCase(), role: req.body?.role === 'compliance' ? 'compliance' : 'officer' };
+    const v = { name: String(req.body?.name || '').trim().slice(0, 100), email: String(req.body?.email || '').trim().toLowerCase(), role: ['compliance', 'admin'].includes(req.body?.role) ? req.body.role : 'officer' };
     const fail = async (error) => res.status(400).render('staff/team', { staffList: await store.listStaff(), error, values: v });
     if (!v.name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return fail('Enter a name and a valid email address.');
     if (String(req.body?.password || '').length < MIN_PASSWORD) return fail(`Temporary password must be at least ${MIN_PASSWORD} characters.`);
