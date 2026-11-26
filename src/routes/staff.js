@@ -263,20 +263,47 @@ export function staffRouter({ store, config, mailer }) {
     res.render('staff/audit', { chain: await verifyAuditChain(store), rows: await store.listAudit({ limit: 300, newestFirst: true }) });
   });
 
-  // ---- Team (compliance officers manage staff accounts) ----------------------------------
-  r.get('/team', requireRole('compliance'), async (req, res) => {
-    res.render('staff/team', { staffList: await store.listStaff(), error: null, values: {} });
+  // ---- Team ---------------------------------------------------------------------------------
+  // Compliance officers manage everyone. Administrators (e.g. HR) may add administrators and
+  // officers and look after administrator accounts, with guards against privilege escalation:
+  //  - they can't create, change or reset compliance officers;
+  //  - officers they create stay "awaiting approval" until a compliance officer approves;
+  //  - they can't reset an officer's password or 2-step (that would let them take the account over).
+  const canManageTeam = (req, res, next) => (['compliance', 'admin'].includes(req.staff.role)
+    ? next() : res.status(403).render('error', { message: 'Your role cannot manage the team.' }));
+  const teamView = async (req, error = null, values = {}) => ({ staffList: await store.listStaff(), error, values, isCompliance: req.staff.role === 'compliance' });
+  const allowedActions = (req, target) => {
+    if (req.staff.role === 'compliance') return ['activate', 'deactivate', 'approve', 'tempPassword', 'resetMfa'];
+    if (target.role === 'compliance') return [];
+    if (target.role === 'admin') return ['activate', 'deactivate', 'tempPassword', 'resetMfa'];
+    return target.pending_approval ? ['deactivate'] : ['activate', 'deactivate']; // officer
+  };
+
+  r.get('/team', canManageTeam, async (req, res) => {
+    const view = await teamView(req);
+    view.staffList = view.staffList.map((s) => ({ ...s, actions: allowedActions(req, s) }));
+    res.render('staff/team', view);
   });
 
-  r.post('/team', requireRole('compliance'), async (req, res) => {
-    const v = { name: String(req.body?.name || '').trim().slice(0, 100), email: String(req.body?.email || '').trim().toLowerCase(), role: ['compliance', 'admin'].includes(req.body?.role) ? req.body.role : 'officer' };
-    const fail = async (error) => res.status(400).render('staff/team', { staffList: await store.listStaff(), error, values: v });
+  r.post('/team', canManageTeam, async (req, res) => {
+    const isCompliance = req.staff.role === 'compliance';
+    const roles = isCompliance ? ['officer', 'admin', 'compliance'] : ['officer', 'admin'];
+    const v = { name: String(req.body?.name || '').trim().slice(0, 100), email: String(req.body?.email || '').trim().toLowerCase(), role: roles.includes(req.body?.role) ? req.body.role : 'officer' };
+    const fail = async (error) => {
+      const view = await teamView(req, error, v);
+      view.staffList = view.staffList.map((s) => ({ ...s, actions: allowedActions(req, s) }));
+      return res.status(400).render('staff/team', view);
+    };
     if (!v.name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return fail('Enter a name and a valid email address.');
     if (String(req.body?.password || '').length < MIN_PASSWORD) return fail(`Temporary password must be at least ${MIN_PASSWORD} characters.`);
     if (await store.getStaffByEmail(v.email)) return fail('An account with this email already exists.');
+    const pending = !isCompliance && v.role === 'officer';
     try {
-      const id = await store.createStaff({ email: v.email, name: v.name, role: v.role, password_hash: hashPassword(req.body.password), must_change_password: true, created_at: Date.now() });
-      await audit(store, { actor: actor(req), action: 'team.staff_created', ip: req.ip, detail: { id, role: v.role } });
+      const id = await store.createStaff({
+        email: v.email, name: v.name, role: v.role, password_hash: hashPassword(req.body.password), must_change_password: true,
+        ...(pending ? { active: false, pending_approval: true } : {}), created_at: Date.now(),
+      });
+      await audit(store, { actor: actor(req), action: 'team.staff_created', ip: req.ip, detail: { id, role: v.role, pendingApproval: pending } });
     } catch (err) {
       if (err.code === 'duplicate') return fail(err.message);
       throw err;
@@ -284,21 +311,22 @@ export function staffRouter({ store, config, mailer }) {
     res.redirect('/staff/team');
   });
 
-  r.post('/team/:id', requireRole('compliance'), async (req, res) => {
+  r.post('/team/:id', canManageTeam, async (req, res) => {
     const target = await store.getStaffById(req.params.id);
     if (!target) return res.status(404).render('error', { message: 'Staff member not found' });
     const action = req.body?.action;
+    if (!allowedActions(req, target).includes(action)) return res.status(403).render('error', { message: 'Your role cannot do that for this account.' });
     if (action === 'deactivate' || action === 'activate') {
-      if (target.id === req.staff.id) return res.status(400).render('error', { message: "You can't deactivate your own account." });
+      if (String(target.id) === req.staff.id) return res.status(400).render('error', { message: "You can't deactivate your own account." });
       await store.updateStaff(target.id, { active: action === 'activate' });
+    } else if (action === 'approve') {
+      await store.updateStaff(target.id, { active: true, pending_approval: false });
     } else if (action === 'tempPassword') {
       const temp = String(req.body?.password || '');
       if (temp.length < MIN_PASSWORD) return res.status(400).render('error', { message: `Temporary password must be at least ${MIN_PASSWORD} characters.` });
       await store.updateStaff(target.id, { password_hash: hashPassword(temp), must_change_password: true, failed_logins: 0, locked_until: null });
     } else if (action === 'resetMfa') {
       await store.updateStaff(target.id, { totp_secret_enc: null, pending_totp_enc: null, totp_last_counter: 0 });
-    } else {
-      return res.status(400).render('error', { message: 'Unknown action' });
     }
     await audit(store, { actor: actor(req), action: `team.${action}`, ip: req.ip, detail: { id: target.id } });
     res.redirect('/staff/team');

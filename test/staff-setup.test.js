@@ -104,6 +104,29 @@ test('administrator: sends invites and sees progress, but no client data, docume
   assert.equal((await fetch(`${base}/staff/cases/${c.id}/report`, { headers: { cookie: hr.cookie } })).status, 403);
   assert.equal((await fetch(`${base}/staff/cases/${c.id}/documents/x`, { headers: { cookie: hr.cookie } })).status, 403);
   assert.equal((await post(`/staff/cases/${c.id}/decision`, { _csrf: csrfOf(dash), decision: 'approved', reason: 'trying as admin' }, hr.cookie)).status, 403);
-  assert.equal((await fetch(base + '/staff/team', { headers: { cookie: hr.cookie } })).status, 403);
   assert.equal((await fetch(base + '/staff/audit', { headers: { cookie: hr.cookie } })).status, 403);
+
+  // Team: administrators can add staff, but with escalation guards.
+  const team = await (await fetch(base + '/staff/team', { headers: { cookie: hr.cookie } })).text();
+  const tc = csrfOf(team);
+  assert.doesNotMatch(team, /value="compliance"/, 'cannot create compliance officers');
+  assert.equal((await post('/staff/team', { _csrf: tc, name: 'Sneaky', email: 'sneaky@firm.co.za', role: 'compliance', password: 'temporary-password-9' }, hr.cookie)).status, 302);
+  assert.equal((await store.getStaffByEmail('sneaky@firm.co.za')).role, 'officer', 'compliance request downgraded');
+  assert.ok((await store.getStaffByEmail('sneaky@firm.co.za')).pending_approval, 'officer created by admin awaits approval');
+  assert.equal((await post('/staff/login', { email: 'sneaky@firm.co.za', password: 'temporary-password-9' })).status, 401, 'cannot log in before approval');
+  const sneakyId = (await store.getStaffByEmail('sneaky@firm.co.za')).id;
+  assert.equal((await post(`/staff/team/${sneakyId}`, { _csrf: tc, action: 'approve' }, hr.cookie)).status, 403, 'admin cannot approve');
+  const officerId = (await store.getStaffByEmail('s@firm.co.za')).id;
+  assert.equal((await post(`/staff/team/${officerId}`, { _csrf: tc, action: 'tempPassword', password: 'takeover-password-1' }, hr.cookie)).status, 403, 'admin cannot reset an officer password');
+  assert.equal((await post(`/staff/team/${officerId}`, { _csrf: tc, action: 'resetMfa' }, hr.cookie)).status, 403, 'admin cannot reset officer 2-step');
+  const complianceId = (await store.getStaffByEmail('n@firm.co.za')).id;
+  assert.equal((await post(`/staff/team/${complianceId}`, { _csrf: tc, action: 'deactivate' }, hr.cookie)).status, 403, 'admin cannot touch compliance');
+  assert.equal((await post('/staff/team', { _csrf: tc, name: 'Thabo', email: 'thabo@firm.co.za', role: 'admin', password: 'temporary-password-8' }, hr.cookie)).status, 302);
+  const thaboId = (await store.getStaffByEmail('thabo@firm.co.za')).id;
+  assert.equal((await post(`/staff/team/${thaboId}`, { _csrf: tc, action: 'tempPassword', password: 'another-temp-pass-1' }, hr.cookie)).status, 302, 'admin can reset another admin');
+
+  // Compliance approves the officer; then they can log in.
+  await post(`/staff/team/${sneakyId}`, { _csrf: admin.csrf, action: 'approve' }, admin.cookie);
+  const approved = await store.getStaffByEmail('sneaky@firm.co.za');
+  assert.ok(approved.active && !approved.pending_approval, 'approved officer is active (login rate limit prevents a 21st login in this file)');
 });

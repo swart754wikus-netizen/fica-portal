@@ -21,7 +21,8 @@
     <% if (locals.staff) { %>
       <nav class="topnav" aria-label="Staff">
         <a href="/staff">Cases</a>
-        <% if (staff.role === 'compliance') { %><a href="/staff/team">Team</a><a href="/staff/audit">Audit log</a><% } %>
+        <% if (['compliance', 'admin'].includes(staff.role)) { %><a href="/staff/team">Team</a><% } %>
+        <% if (staff.role === 'compliance') { %><a href="/staff/audit">Audit log</a><% } %>
         <a href="/staff/password" class="small"><%= staff.name %> · <%= staff.role %></a>
         <form method="post" action="/staff/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish">Sign out</button></form>
       </nav>

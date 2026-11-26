@@ -107,5 +107,15 @@ document.addEventListener('DOMContentLoaded', () => {
     f.addEventListener('submit', () => setTimeout(() => f.querySelectorAll('button').forEach((b) => { b.disabled = true; }), 0));
   });
   document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
+
+  // Generate a strong, easy-to-read temporary password (no look-alike characters).
+  document.querySelectorAll('[data-generate-pw]').forEach((b) => b.addEventListener('click', () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const bytes = crypto.getRandomValues(new Uint32Array(15));
+    const raw = Array.from(bytes, (n) => alphabet[n % alphabet.length]).join('');
+    const input = b.closest('form').querySelector('[data-pw-target]');
+    input.value = `${raw.slice(0, 5)}-${raw.slice(5, 10)}-${raw.slice(10)}`;
+    input.select();
+  }));
   document.querySelectorAll('[data-confirm]').forEach((b) => b.addEventListener('click', (e) => { if (!confirm(b.dataset.confirm)) e.preventDefault(); }));
 });
