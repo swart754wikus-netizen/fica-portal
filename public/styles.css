@@ -125,3 +125,4 @@ td.num, th.num { text-align: right; }
 .enroll-steps { padding-left: 1.2rem; } .enroll-steps li { margin-bottom: .4rem; }
 .row-actions { display: flex; gap: .4rem; flex-wrap: wrap; } .row-actions form { margin: 0; } .row-actions .btn { min-height: 36px; padding: .3rem .7rem; font-size: .85rem; }
 .kept-note { display: block; color: var(--ok); margin-top: .3rem; }
+.temp-pw { display: flex; gap: .3rem; } .temp-pw input { margin: 0 !important; min-height: 36px !important; padding: .3rem .5rem !important; width: 190px !important; font-size: .85rem; }

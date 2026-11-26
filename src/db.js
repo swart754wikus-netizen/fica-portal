@@ -92,6 +92,7 @@ export function openDb(path) {
   const staffCols = db.prepare('PRAGMA table_info(staff)').all().map((c) => c.name);
   if (!staffCols.includes('active')) db.exec('ALTER TABLE staff ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
   if (!staffCols.includes('pending_totp_enc')) db.exec('ALTER TABLE staff ADD COLUMN pending_totp_enc BLOB');
+  if (!staffCols.includes('must_change_password')) db.exec('ALTER TABLE staff ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
   if (!staffCols.includes('totp_last_counter')) db.exec('ALTER TABLE staff ADD COLUMN totp_last_counter INTEGER NOT NULL DEFAULT 0');
   db.exec('CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset INTEGER NOT NULL)');
   return db;

@@ -16,7 +16,7 @@
       <nav class="topnav" aria-label="Staff">
         <a href="/staff">Cases</a>
         <% if (staff.role === 'compliance') { %><a href="/staff/team">Team</a><a href="/staff/audit">Audit log</a><% } %>
-        <span class="muted small"><%= staff.name %> · <%= staff.role %></span>
+        <a href="/staff/password" class="small"><%= staff.name %> · <%= staff.role %></a>
         <form method="post" action="/staff/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="linkish">Sign out</button></form>
       </nav>
     <% } else { %>

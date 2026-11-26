@@ -32,7 +32,7 @@ export function loadSession(store, { ttlMinutes }) {
         if (s && staff && staff.active !== false && staff.active !== 0) {
           await store.updateSession(hash, { expires_at: Date.now() + ttlMinutes * 60_000 });
           req.session = { ...s, token_hash: hash };
-          req.staff = { id: String(staff.id), email: staff.email, name: staff.name, role: staff.role };
+          req.staff = { id: String(staff.id), email: staff.email, name: staff.name, role: staff.role, mustChangePassword: Boolean(staff.must_change_password) };
         } else if (s) {
           await store.deleteSession(hash);
         }

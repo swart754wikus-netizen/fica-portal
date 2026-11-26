@@ -113,6 +113,23 @@ export function staffRouter({ store, config, mailer }) {
 
   // ---- Everything below requires an MFA-verified session ---------------------------------
   r.use(requireStaff);
+
+  // Accounts created with a temporary password must choose their own before doing anything else.
+  r.use((req, res, next) => (req.staff.mustChangePassword && req.path !== '/password' ? res.redirect('/staff/password') : next()));
+
+  r.get('/password', (req, res) => res.render('staff/password', { error: null, forced: req.staff.mustChangePassword }));
+  r.post('/password', loginLimiter, async (req, res) => {
+    const s = await store.getStaffById(req.staff.id);
+    const fail = (error) => res.status(400).render('staff/password', { error, forced: req.staff.mustChangePassword });
+    const next = String(req.body?.newPassword || '');
+    if (!verifyPassword(String(req.body?.currentPassword || ''), s.password_hash)) return fail('Your current password is incorrect.');
+    if (next.length < MIN_PASSWORD) return fail(`Choose a password of at least ${MIN_PASSWORD} characters.`);
+    if (next !== String(req.body?.confirmPassword || '')) return fail('The two new passwords do not match.');
+    if (verifyPassword(next, s.password_hash)) return fail('Choose a password different from your current one.');
+    await store.updateStaff(s.id, { password_hash: hashPassword(next), must_change_password: false });
+    await audit(store, { actor: `staff:${s.email}`, action: 'auth.password_changed', ip: req.ip });
+    res.redirect('/staff?password=changed');
+  });
   const actor = (req) => `staff:${req.staff.email}`;
   const staffName = async (id) => (id ? (await store.getStaffById(id))?.name : null);
 
@@ -245,7 +262,7 @@ export function staffRouter({ store, config, mailer }) {
     if (String(req.body?.password || '').length < MIN_PASSWORD) return fail(`Temporary password must be at least ${MIN_PASSWORD} characters.`);
     if (await store.getStaffByEmail(v.email)) return fail('An account with this email already exists.');
     try {
-      const id = await store.createStaff({ email: v.email, name: v.name, role: v.role, password_hash: hashPassword(req.body.password), created_at: Date.now() });
+      const id = await store.createStaff({ email: v.email, name: v.name, role: v.role, password_hash: hashPassword(req.body.password), must_change_password: true, created_at: Date.now() });
       await audit(store, { actor: actor(req), action: 'team.staff_created', ip: req.ip, detail: { id, role: v.role } });
     } catch (err) {
       if (err.code === 'duplicate') return fail(err.message);
@@ -261,6 +278,10 @@ export function staffRouter({ store, config, mailer }) {
     if (action === 'deactivate' || action === 'activate') {
       if (target.id === req.staff.id) return res.status(400).render('error', { message: "You can't deactivate your own account." });
       await store.updateStaff(target.id, { active: action === 'activate' });
+    } else if (action === 'tempPassword') {
+      const temp = String(req.body?.password || '');
+      if (temp.length < MIN_PASSWORD) return res.status(400).render('error', { message: `Temporary password must be at least ${MIN_PASSWORD} characters.` });
+      await store.updateStaff(target.id, { password_hash: hashPassword(temp), must_change_password: true, failed_logins: 0, locked_until: null });
     } else if (action === 'resetMfa') {
       await store.updateStaff(target.id, { totp_secret_enc: null, pending_totp_enc: null, totp_last_counter: 0 });
     } else {

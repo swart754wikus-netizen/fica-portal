@@ -64,17 +64,25 @@ test('team: compliance adds an officer; deactivation ends their session; MFA res
   assert.equal(dup.status, 400);
   const officer = await login('s@firm.co.za', 'temporary-password-1');
   assert.ok(officer.cookie);
+  // Forced to choose their own password before anything else.
+  const blocked = await fetch(base + '/staff', { redirect: 'manual', headers: { cookie: officer.cookie } });
+  assert.equal(blocked.headers.get('location'), '/staff/password');
+  const pwPage = await (await fetch(base + '/staff/password', { headers: { cookie: officer.cookie } })).text();
+  const pwCsrf = csrfOf(pwPage);
+  assert.equal((await post('/staff/password', { _csrf: pwCsrf, currentPassword: 'wrong', newPassword: 'my-own-secret-pass', confirmPassword: 'my-own-secret-pass' }, officer.cookie)).status, 400);
+  assert.equal((await post('/staff/password', { _csrf: pwCsrf, currentPassword: 'temporary-password-1', newPassword: 'my-own-secret-pass', confirmPassword: 'my-own-secret-pass' }, officer.cookie)).status, 302);
+  assert.equal((await fetch(base + '/staff', { redirect: 'manual', headers: { cookie: officer.cookie } })).status, 200, 'now allowed in');
   assert.equal((await fetch(base + '/staff/team', { headers: { cookie: officer.cookie } })).status, 403, 'officers cannot manage the team');
 
   const id = (await store.getStaffByEmail('s@firm.co.za')).id;
   await post(`/staff/team/${id}`, { _csrf: admin.csrf, action: 'deactivate' }, admin.cookie);
   const after = await fetch(base + '/staff', { redirect: 'manual', headers: { cookie: officer.cookie } });
   assert.equal(after.headers.get('location'), '/staff/login', 'session ended');
-  assert.equal((await post('/staff/login', { email: 's@firm.co.za', password: 'temporary-password-1' })).status, 401, 'cannot log in');
+  assert.equal((await post('/staff/login', { email: 's@firm.co.za', password: 'my-own-secret-pass' })).status, 401, 'cannot log in');
 
   await post(`/staff/team/${id}`, { _csrf: admin.csrf, action: 'activate' }, admin.cookie);
   await post(`/staff/team/${id}`, { _csrf: admin.csrf, action: 'resetMfa' }, admin.cookie);
-  const again = await login('s@firm.co.za', 'temporary-password-1');
+  const again = await login('s@firm.co.za', 'my-own-secret-pass');
   assert.ok(again.cookie);
   assert.notEqual(again.secret, officer.secret, 'new authenticator secret after reset');
 });
