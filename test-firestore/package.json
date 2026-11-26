@@ -4,7 +4,7 @@
   "type": "module",
   "description": "End-to-end tests against the Firestore + Storage emulators (needs Java 11+). Kept separate so firebase-tools never ships to Vercel.",
   "scripts": {
-    "test": "cd .. && firebase emulators:exec --only firestore,storage --project demo-fica-portal \"node --test test-firestore/firestore.test.js\""
+    "test": "cd .. && firebase emulators:exec --only firestore,storage --project demo-fica-portal \"node --test test-firestore/*.test.js\""
   },
   "devDependencies": { "firebase-tools": "^15.0.0" }
 }

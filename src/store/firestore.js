@@ -52,7 +52,11 @@ export function firestoreStore({ projectId, clientEmail, privateKey, storageBuck
     // ---- sessions (doc ID = SHA-256 of the cookie token) ----
     async createSession(row) { await col('sessions').doc(row.token_hash).set({ mfa_attempts: 0, ...row, mfa_ok: row.mfa_ok ? 1 : 0 }); },
     async getSession(hash) { return withId(await col('sessions').doc(hash).get()); },
-    async updateSession(hash, patch) { await col('sessions').doc(hash).update(patch); },
+    // A session can vanish between read and write (login rotation, a double-submitted form,
+    // logout in another tab). That's not an error — the next request simply has no session.
+    async updateSession(hash, patch) {
+      try { await col('sessions').doc(hash).update(patch); } catch (err) { if (err.code !== 5) throw err; }
+    },
     async deleteSession(hash) { await col('sessions').doc(hash).delete(); },
 
     // ---- cases ----

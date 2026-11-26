@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try { await navigator.clipboard.writeText(input.value); } catch { input.select(); document.execCommand('copy'); }
     b.textContent = 'Copied ✓';
   }));
+  // Staff forms: lock buttons after the first submit so a double-click/Enter can't send twice.
+  // (Deferred so the clicked button's name/value is still included in the submission.)
+  document.querySelectorAll('form').forEach((f) => {
+    if (f.dataset.directUpload !== undefined) return; // client form handles this itself
+    f.addEventListener('submit', () => setTimeout(() => f.querySelectorAll('button').forEach((b) => { b.disabled = true; }), 0));
+  });
   document.querySelector('[data-print]')?.addEventListener('click', () => window.print());
   document.querySelectorAll('[data-confirm]').forEach((b) => b.addEventListener('click', (e) => { if (!confirm(b.dataset.confirm)) e.preventDefault(); }));
 });
