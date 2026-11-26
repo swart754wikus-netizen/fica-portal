@@ -54,6 +54,7 @@ Mock provider test triggers (surname, for the client and for every person listed
    | `BASE_URL` | the site address, e.g. `https://fica.firm.co.za` |
    | `FIREBASE_SERVICE_ACCOUNT` | the **entire** downloaded `.json` key file (open in Notepad → Ctrl+A → Ctrl+C → paste). Alternatively set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` separately. |
    | `FIREBASE_STORAGE_BUCKET` | from Storage, e.g. `firm-fica.firebasestorage.app` |
+   | `NODEJS_HELPERS` | `0` — turns off Vercel's own request-body parsing so Express reads forms and uploads itself |
    Deploy. (Vercel's free Hobby plan is for non-commercial use; a firm's live system belongs on Pro.)
 3. Open `BASE_URL/staff/setup`, enter `SETUP_TOKEN`, create the compliance officer, log in and set up the
    authenticator app. Add other staff under **Team**. Optionally remove `SETUP_TOKEN` afterwards.

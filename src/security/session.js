@@ -63,6 +63,7 @@ export const csrfCheck = (req, res, next) => {
     console.warn('CSRF rejected', JSON.stringify({
       path: req.originalUrl, hasCookieHeader: Boolean(req.headers.cookie), hasSessionCookie: /fica_sid=/.test(req.headers.cookie || ''),
       sessionFound: Boolean(req.session), bodyType: typeof req.body, bodyHasToken: Boolean(req.body?._csrf), contentType: req.headers['content-type'],
+      bodyFieldNames: req.body && typeof req.body === 'object' ? Object.keys(req.body).slice(0, 10) : null, contentLength: req.headers['content-length'], vercelHelpers: process.env.NODEJS_HELPERS !== '0',
     }));
     const message = req.session
       ? 'Security token expired. Please reload the page and try again.'
