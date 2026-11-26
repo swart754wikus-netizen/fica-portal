@@ -27,6 +27,7 @@ async function login(email, password, secret, at = Date.now()) {
   let cookie = cookieOf(res);
   const page = await (await fetch(base + '/staff/mfa', { headers: { cookie } })).text();
   const shown = page.match(/class="setup-key">([A-Z2-7 ]+)</)?.[1]?.replace(/\s/g, '');
+  if (shown) assert.match(page, /<img class="enroll-qr" src="data:image\/png;base64,/, 'QR code shown for enrolment');
   const s = secret || shown;
   const v = await post('/staff/mfa', { _csrf: csrfOf(page), code: totp(s, at) }, cookie);
   if (v.status !== 302) return { failed: v.status, secret: s };

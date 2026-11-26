@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import QRCode from 'qrcode';
 import crypto from 'node:crypto';
 import { verifyPassword, hashPassword, encrypt, decrypt, decryptJson, randomToken, sha256, safeEqual } from '../security/crypto.js';
 import { verifyTotp, generateSecret, otpauthUri } from '../security/totp.js';
@@ -70,7 +71,10 @@ export function staffRouter({ store, config, mailer }) {
       secret = generateSecret();
       await store.updateStaff(s.id, { pending_totp_enc: encrypt(secret, config.dataKey, totpAad(s)) });
     }
-    return { enroll: true, secret: secret.replace(/(.{4})/g, '$1 ').trim(), uri: otpauthUri(secret, s.email, config.firmName) };
+    const uri = otpauthUri(secret, s.email, config.firmName);
+    // QR rendered server-side as a data: URL — the secret never goes to a third-party QR service.
+    const qr = await QRCode.toDataURL(uri, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
+    return { enroll: true, secret: secret.replace(/(.{4})/g, '$1 ').trim(), uri, qr };
   }
 
   r.get('/mfa', async (req, res) => {

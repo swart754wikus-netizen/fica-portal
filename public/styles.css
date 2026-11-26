@@ -126,3 +126,4 @@ td.num, th.num { text-align: right; }
 .row-actions { display: flex; gap: .4rem; flex-wrap: wrap; } .row-actions form { margin: 0; } .row-actions .btn { min-height: 36px; padding: .3rem .7rem; font-size: .85rem; }
 .kept-note { display: block; color: var(--ok); margin-top: .3rem; }
 .temp-pw { display: flex; gap: .3rem; } .temp-pw input { margin: 0 !important; min-height: 36px !important; padding: .3rem .5rem !important; width: 190px !important; font-size: .85rem; }
+.enroll-qr { display: block; margin: .5rem auto 1rem; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: #fff; image-rendering: pixelated; }

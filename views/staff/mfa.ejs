@@ -3,13 +3,19 @@
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <% if (locals.enroll) { %>
     <h1>Set up two-step verification</h1>
-    <p class="muted small">Required for access to client FICA records. Install Google Authenticator or Microsoft Authenticator on your phone, then:</p>
+    <p class="muted small">Required for access to client FICA records. Install <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> on your phone, then:</p>
     <ol class="small enroll-steps">
-      <li>Tap <strong>+</strong> → <strong>Enter a setup key</strong> (or tap the link below on your phone).</li>
-      <li>Key: <code class="setup-key"><%= secret %></code></li>
-      <li>Type the 6-digit code the app shows.</li>
+      <li>In the app tap <strong>+</strong> → <strong>Scan a QR code</strong> and point your phone at this code:</li>
     </ol>
-    <p class="small"><a href="<%= uri %>">Open in authenticator app</a></p>
+    <% if (locals.qr) { %><img class="enroll-qr" src="<%= qr %>" alt="QR code to add this account to your authenticator app" width="220" height="220"><% } %>
+    <ol class="small enroll-steps" start="2">
+      <li>Type the 6-digit code the app shows, below.</li>
+    </ol>
+    <details class="small"><summary>Can't scan? Enter the key by hand</summary>
+      <p>In the app choose <strong>Enter a setup key</strong> and type: <code class="setup-key"><%= secret %></code></p>
+      <p><a href="<%= uri %>">Or tap here if you're on your phone</a></p>
+    </details>
+    <p class="small muted">Keep this screen private — don't screenshot or share the code.</p>
   <% } else { %>
     <h1>Enter your 6-digit code</h1>
     <p class="muted small">Open your authenticator app.</p>
