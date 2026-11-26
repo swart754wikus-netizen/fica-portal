@@ -59,7 +59,15 @@ export const csrfCheck = (req, res, next) => {
   // Pre-auth forms have no session to bind a token to; SameSite=Strict + rate limiting cover them.
   if (req.method === 'POST' && (req.path === '/login' || req.path === '/setup')) return next();
   if (!req.session || !safeEqual(req.body?._csrf ?? '', req.session.csrf)) {
-    return res.status(403).render('error', { message: 'Security token expired. Please reload the page.' });
+    // Diagnostics only — never the token values.
+    console.warn('CSRF rejected', JSON.stringify({
+      path: req.originalUrl, hasCookieHeader: Boolean(req.headers.cookie), hasSessionCookie: /fica_sid=/.test(req.headers.cookie || ''),
+      sessionFound: Boolean(req.session), bodyType: typeof req.body, bodyHasToken: Boolean(req.body?._csrf), contentType: req.headers['content-type'],
+    }));
+    const message = req.session
+      ? 'Security token expired. Please reload the page and try again.'
+      : 'Your login session was not found (it may have expired, or your browser blocked the cookie). Please log in again.';
+    return res.status(403).render('error', { message });
   }
   next();
 };
