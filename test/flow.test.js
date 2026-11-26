@@ -133,8 +133,8 @@ test('full low-risk flow: invite → submit → approve → report', async () =>
   assert.equal(db.prepare('SELECT status FROM cases WHERE id = ?').get(c.id).status, 'approved');
 
   const report = await (await fetch(`${base}/staff/cases/${c.id}/report`, { headers: { cookie: sess.cookie } })).text();
-  assert.match(report, /Know Your Customer Report/);
-  assert.match(report, /APPROVED/);
+  assert.match(report, /Know your customer report/);
+  assert.match(report, /<strong>Approved<\/strong>/);
 });
 
 test('sanctioned client is high risk and an officer cannot approve', async () => {

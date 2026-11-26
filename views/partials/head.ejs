@@ -4,14 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title><%= typeof title !== 'undefined' ? title + ' · ' : '' %>Client Onboarding</title>
+  <title><%= typeof title !== 'undefined' ? title + ' · ' : '' %><%= firmName %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700&family=Roboto:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
 <header class="topbar">
   <div class="wrap topbar-inner">
-    <a class="brand" href="<%= locals.staff ? '/staff' : '/' %>"><span class="brand-mark" aria-hidden="true">✓</span> Secure Onboarding</a>
+    <a class="brand" href="<%= locals.staff ? '/staff' : '/' %>">
+      <% if (locals.logoOnDark) { %><img src="<%= logoOnDark %>" alt="<%= firmName %>"><% } else { %><span class="brand-name"><%= firmName %></span><% } %>
+      <span class="brand-product">Client verification</span>
+    </a>
     <% if (locals.staff) { %>
       <nav class="topnav" aria-label="Staff">
         <a href="/staff">Cases</a>

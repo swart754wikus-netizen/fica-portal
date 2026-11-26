@@ -27,7 +27,19 @@ export function createApp({ store, config, provider = getProvider(config.provide
   app.set('views', join(root, 'views'));
   app.set('trust proxy', config.isProd ? 1 : false);
   app.disable('x-powered-by');
-  Object.assign(app.locals, catalog, { firmName: config.firmName || 'Our firm', mockScreening: (config.provider || 'mock') === 'mock' });
+  // Supplied artwork only (brand rule: never a typed replacement logo). Drop the files in public/brand/.
+  const logoFile = ['logo-white.svg', 'logo-white.png'].find((f) => existsSync(join(root, 'public/brand', f)));
+  const logoDarkFile = ['logo-dark.svg', 'logo-dark.png'].find((f) => existsSync(join(root, 'public/brand', f)));
+  const tz = { timeZone: 'Africa/Johannesburg' };
+  Object.assign(app.locals, catalog, {
+    firmName: config.firmName || 'Our firm',
+    mockScreening: (config.provider || 'mock') === 'mock',
+    logoOnDark: logoFile ? `/static/brand/${logoFile}` : null,   // reversed white wordmark on Graphite
+    logoOnLight: logoDarkFile ? `/static/brand/${logoDarkFile}` : null, // dark wordmark on white / Mist White
+    // FVLN convention: 12 November 2026 (UK style, no ordinals).
+    fmtDate: (ts) => (ts ? new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', ...tz }) : '—'),
+    fmtDateTime: (ts) => (ts ? new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', ...tz }) : '—'),
+  });
 
   app.use(helmet({
     contentSecurityPolicy: {

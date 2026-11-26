@@ -32,5 +32,6 @@ export function getMailer(config) {
 }
 
 export async function sendInvite(mailer, config, { to, clientName, reference, link, expiresAt }) {
-  return mailer.send({ to, ...inviteEmail({ firmName: config.firmName, clientName, reference, link, expiresAt }) });
+  const logoUrl = config.baseUrl?.startsWith('https://') ? `${config.baseUrl}/static/brand/logo-white.png` : null;
+  return mailer.send({ to, ...inviteEmail({ firmName: config.firmName, clientName, reference, link, expiresAt, logoUrl }) });
 }

@@ -1,5 +1,5 @@
 <%
-  const fmt = (ts) => ts ? new Date(ts).toLocaleString('en-ZA') : '—';
+  const fmt = fmtDateTime;
   const check = (ok, good, bad) => `<span class="pill ${ok ? 'ok' : 'bad'}">${ok ? good : bad}</span>`;
 %>
 <%- include('../partials/head', { title: c.reference }) %>
@@ -43,7 +43,7 @@
   </section>
 
   <section class="card">
-    <h2>Screening <span class="small muted">(<%= screening.provider %> · <%= fmt(Date.parse(screening.checkedAt)) %>)</span></h2>
+    <h2>Screening <span class="small muted">(<%= screening.provider %> · <%= fmtDateTime(screening.checkedAt) %>)</span></h2>
     <ul class="checks">
       <li>Identity <%- check(screening.identity.verified, 'Verified', 'Not verified') %> <span class="small muted"><%= screening.identity.detail %></span></li>
       <li>Address <%- check(screening.address.verified, 'Verified', 'Not verified') %></li>
@@ -98,7 +98,7 @@
     <dl class="kv">
       <dt>Full name</dt><dd><%= data.firstName %> <%= data.lastName %></dd>
       <dt><%= data.idType === 'sa_id' ? 'SA ID number' : 'Passport number' %></dt><dd class="mono"><%= data.idNumber %></dd>
-      <dt>Date of birth</dt><dd><%= data.dateOfBirth %></dd>
+      <dt>Date of birth</dt><dd><%= fmtDate(data.dateOfBirth) %></dd>
       <dt>Nationality / residence</dt><dd><%= data.nationality %> / <%= data.countryOfResidence %></dd>
       <dt>Phone</dt><dd><%= data.phone || '—' %></dd>
       <dt>Tax no.</dt><dd class="mono"><%= data.taxNumber || '—' %></dd>
@@ -107,7 +107,7 @@
       <dt>Source of funds</dt><dd><%= data.sourceOfFunds.replace(/_/g, ' ') %></dd>
       <dt>Annual income / turnover</dt><dd>R <%= Number(data.expectedValueZar).toLocaleString('en-ZA') %></dd>
       <dt>Purpose</dt><dd><%= data.purpose %></dd>
-      <dt>POPIA consent</dt><dd class="small"><%= data.consent.at %> from <%= data.consent.ip %></dd>
+      <dt>POPIA consent</dt><dd class="small"><%= fmtDateTime(data.consent.at) %> from <%= data.consent.ip %></dd>
     </dl>
   </section>
 

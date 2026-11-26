@@ -29,7 +29,7 @@
         <td><span class="pill status-<%= c.status %>"><%= c.status %></span></td>
         <td><% if (c.risk_level) { %><span class="pill risk-<%= c.risk_level %>"><%= c.risk_level %> · <%= c.risk_score %></span><% } else { %>—<% } %></td>
         <td><%= c.dd_level || '—' %></td>
-        <td class="small"><%= new Date(c.created_at).toLocaleDateString('en-ZA') %></td>
+        <td class="small"><%= fmtDate(c.created_at) %></td>
       </tr>
     <% } %>
     </tbody>

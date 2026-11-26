@@ -1,8 +1,23 @@
-body { font: 13px/1.5 system-ui, sans-serif; color: #111; max-width: 820px; margin: 0 auto; padding: 24px; }
-header { border-bottom: 3px solid #1b2a4e; margin-bottom: 16px; }
-h1 { color: #1b2a4e; margin: 0 0 4px; } h2 { font-size: 15px; color: #1b2a4e; border-bottom: 1px solid #ccd; padding-bottom: 4px; margin-top: 24px; }
-.conf { color: #c62a3b; font-weight: 700; font-size: 11px; letter-spacing: .05em; }
-table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 5px 8px; border: 1px solid #dde; vertical-align: top; }
-th { background: #f3f5fa; width: 32%; } .mono { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
-.toolbar { text-align: right; } .toolbar button { padding: 8px 14px; font: inherit; cursor: pointer; }
+/* FVLN document standard: A4 portrait, 25 mm side margins, Roboto 11 pt black body,
+   League Spartan headings (24 / 18 pt bold), table headers bold, 9 pt footer, colour used sparingly. */
+@page { size: A4 portrait; margin: 20mm 25mm; }
+body { font: 11pt/1.15 "Roboto", Arial, sans-serif; color: #000; max-width: 160mm; margin: 0 auto; padding: 12mm 0; background: #fff; }
+h1, h2, h3 { font-family: "League Spartan", "Roboto", Arial, sans-serif; color: #3D3D3D; font-weight: 700; margin: 0 0 6pt; }
+h1 { font-size: 24pt; }
+h2 { font-size: 18pt; margin-top: 18pt; padding-bottom: 3pt; border-bottom: 1.5pt solid #7ABD98; }
+h3 { font-size: 13pt; margin-top: 12pt; }
+p { margin: 0 0 6pt; }
+header { margin-bottom: 12pt; }
+.logo { height: 16mm; width: auto; display: block; margin: 0 0 6pt -2mm; } /* fixed size, proportions preserved */
+.firm { font-family: "League Spartan", "Roboto", Arial, sans-serif; font-weight: 600; color: #2D6A50; font-size: 12pt; margin-bottom: 4pt; }
+.conf { font-weight: 700; color: #3D3D3D; font-size: 9pt; }
+table { width: 100%; border-collapse: collapse; margin: 0 0 6pt; }
+th, td { text-align: left; padding: 4pt 6pt; border: 0.5pt solid #CFCFCB; vertical-align: top; font-size: 10.5pt; }
+th { font-weight: 700; background: #F5F5F3; width: 32%; }
+thead { display: table-header-group; }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt; word-break: break-all; }
+footer { font-size: 9pt; color: #3D3D3D; margin-top: 18pt; border-top: 0.5pt solid #CFCFCB; padding-top: 6pt; }
+footer a { color: #2D6A50; }
+.toolbar { text-align: right; margin-bottom: 8pt; }
+.toolbar button { font: 500 11pt "Roboto", Arial, sans-serif; padding: 8px 14px; cursor: pointer; background: #2D6A50; color: #fff; border: 0; border-radius: 6px; }
 @media print { .no-print { display: none; } body { padding: 0; } section { break-inside: avoid; } }
